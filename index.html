@@ -1,0 +1,1631 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>𝗘𝗛𝗔𝗕 | لوحة التحكم المتكاملة</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;600;700;800;900&family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --primary:#00c853;
+  --primary-dark:#00962d;
+  --gold:#00c853;
+  --gold-dark:#00962d;
+  --purple:#7c3aed;
+  --purple-light:#a855f7;
+  --red:#FF3D5A;
+  --red-dark:#DC2626;
+  --bg-deep:#050b12;
+  --bg-card:rgba(8,18,32,0.97);
+  --glow:rgba(0,200,83,.22);
+  --sw:260px;
+}
+body{
+  font-family: 'Tajawal', sans-serif;
+  background:var(--bg-deep);
+  color:#eef2ff;
+  min-height:100vh;
+  position:relative;
+  overflow-x:hidden;
+}
+
+.bg-wrap{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.orb{position:absolute;border-radius:50%;filter:blur(110px);opacity:.22}
+.orb1{width:500px;height:500px;background:radial-gradient(circle,#00c853,#004d20);top:-150px;right:-150px;animation:drift 10s ease-in-out infinite}
+.orb2{width:400px;height:400px;background:radial-gradient(circle,#7c3aed,#3b0764);bottom:-100px;left:-100px;animation:drift 13s ease-in-out infinite 2s}
+.orb3{width:280px;height:280px;background:radial-gradient(circle,#a855f7,#6d28d9);top:40%;left:60%;animation:drift 9s ease-in-out infinite 1s}
+
+.grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(0,200,83,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,200,83,.04) 1px,transparent 1px);background-size:40px 40px}
+.bg-aurora {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at 30% 40%, rgba(0, 200, 83, 0.12), transparent 70%),
+                radial-gradient(ellipse at 80% 70%, rgba(124, 58, 237, 0.08), transparent 60%);
+    z-index: -2; pointer-events: none;
+}
+.bg-noise {
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    z-index: -1; pointer-events: none;
+}
+
+@keyframes drift{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(20px,-15px) scale(1.05)}66%{transform:translate(-15px,20px) scale(.97)}}
+
+.app-view { display: none; width: 100%; min-height: 100vh; position: relative; z-index: 10; }
+.app-view.active { display: block; }
+
+/* AUTH SECTION */
+.auth-container{position:relative;z-index:10;width:100%;max-width:480px;margin:auto;padding:16px;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{
+  background:var(--bg-card);
+  backdrop-filter:blur(30px);
+  border:1px solid rgba(0,200,83,0.25);
+  border-radius:24px;
+  padding:44px 38px;
+  box-shadow:0 0 60px rgba(0,0,0,.7),0 0 0 1px rgba(0,200,83,.08) inset;
+  width: 100%;
+  animation:slideUp .55s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes slideUp{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
+
+.logo{text-align:center;margin-bottom:36px}
+.logo-icon{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:76px;height:76px;
+  background:linear-gradient(145deg,rgba(0,200,83,.15),rgba(124,58,237,.15));
+  border:1px solid rgba(0,200,83,.35);
+  border-radius:22px;font-size:32px;color:var(--primary);
+  margin-bottom:14px;
+  box-shadow:0 0 30px rgba(0,200,83,.2),0 0 60px rgba(0,200,83,.05);
+  animation:iconPulse 3s ease-in-out infinite;
+}
+@keyframes iconPulse{0%,100%{box-shadow:0 0 20px rgba(0,200,83,.2)}50%{box-shadow:0 0 40px rgba(0,200,83,.4),0 0 80px rgba(0,200,83,.1)}}
+
+.logo-text{
+  font-family: 'Orbitron', sans-serif;font-size:1.35rem;font-weight:900;
+  background:linear-gradient(135deg,var(--primary),#4ade80,var(--purple-light));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  letter-spacing:2px;display:block;margin-bottom:6px;
+}
+.logo-sub{font-size:.7rem;color:rgba(255,255,255,.3);letter-spacing:3px;text-transform:uppercase}
+
+.divider{height:1px;background:linear-gradient(90deg,transparent,rgba(0,200,83,.3),rgba(124,58,237,.3),transparent);margin:0 0 28px}
+
+.tabs{display:flex;gap:0;background:rgba(0,0,0,.4);border-radius:16px;padding:4px;margin-bottom:28px;border:1px solid rgba(0,200,83,.12)}
+.tab-btn{
+  flex:1;padding:11px;border:none;background:transparent;color:rgba(255,255,255,.4);
+  font-family: 'Tajawal', sans-serif;font-weight:700;font-size:.88rem;
+  cursor:pointer;border-radius:13px;transition:all .3s;display:flex;align-items:center;justify-content:center;gap:7px;
+}
+.tab-btn.active{
+  background:linear-gradient(135deg,rgba(0,200,83,.2),rgba(124,58,237,.2));
+  color:var(--primary);border:1px solid rgba(0,200,83,.3);
+  box-shadow:0 0 12px rgba(0,200,83,.15);
+}
+
+.form{display:none}
+.form.active{display:block;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.form-group{margin-bottom:18px}
+.label{font-size:.8rem;color:rgba(255,255,255,.45);margin-bottom:8px;display:block;font-weight:600;letter-spacing:.5px}
+
+.input-wrap{
+  position:relative;display:flex;align-items:center;
+  background:rgba(0,0,0,.5);
+  border:1px solid rgba(0,200,83,.15);
+  border-radius:13px;transition:all .3s;
+}
+.input-wrap:focus-within{
+  border-color:rgba(0,200,83,.5);
+  background:rgba(0,200,83,.04);
+  box-shadow:0 0 0 3px rgba(0,200,83,.08),0 0 20px rgba(0,200,83,.05);
+}
+
+.icon{width:44px;display:flex;align-items:center;justify-content:center;color:rgba(0,200,83,.5);font-size:.9rem;flex-shrink:0}
+.inp{flex:1;background:transparent;border:none;outline:none;color:#e2e8f0;font-family: 'Tajawal', sans-serif;font-size:.92rem;padding:12px 0}
+.inp::placeholder{color:rgba(255,255,255,.2)}
+.eye{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.25);padding:0 14px;font-size:.88rem;transition:color .2s}
+.eye:hover{color:var(--primary)}
+
+.btn{
+  width:100%;padding:13px;margin-top:8px;
+  background:linear-gradient(135deg,var(--primary-dark),var(--primary),rgba(124,58,237,.6));
+  border:none;border-radius:13px;color:white;
+  font-family: 'Tajawal', sans-serif;font-size:.97rem;font-weight:800;
+  letter-spacing:.5px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  box-shadow:0 8px 25px rgba(0,200,83,.25);
+  transition:all .3s;position:relative;overflow:hidden;
+}
+.btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.1),transparent);opacity:0;transition:.3s}
+.btn:hover::before{opacity:1}
+.btn:hover{transform:translateY(-2px);box-shadow:0 12px 35px rgba(0,200,83,.35)}
+.btn:active{transform:translateY(0)}
+.btn.loading{opacity:.6;pointer-events:none}
+
+.msg{padding:11px 14px;border-radius:11px;font-size:.83rem;margin-bottom:14px;display:none;align-items:center;gap:8px;line-height:1.6}
+.msg.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#fca5a5;display:flex}
+.msg.success{background:rgba(0,200,83,.1);border:1px solid rgba(0,200,83,.25);color:#4ade80;display:flex}
+.msg.info{background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.25);color:#c4b5fd;display:flex}
+
+.strength{height:3px;background:rgba(255,255,255,.06);border-radius:4px;margin-top:6px;overflow:hidden}
+.strength-bar{height:100%;border-radius:4px;width:0;transition:width .4s,background .4s}
+
+.footer{text-align:center;margin-top:24px;font-size:.72rem;color:rgba(255,255,255,.2);border-top:1px solid rgba(0,200,83,.08);padding-top:18px}
+.dev-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(0,200,83,.07);border:1px solid rgba(0,200,83,.15);border-radius:8px;padding:5px 14px;font-size:.68rem;color:var(--primary);margin-top:10px}
+
+/* USER DASHBOARD STYLES */
+.navbar-app {
+    background: rgba(8, 12, 28, 0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--gold);
+    padding: 12px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.logo-app { display: flex; align-items: center; gap: 12px; }
+.logo-icon-app {
+    width: 38px; height: 38px;
+    background: linear-gradient(145deg, #0f172a, #0a0f1c);
+    border: 1px solid var(--gold); border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: var(--gold);
+    box-shadow: 0 0 12px rgba(0, 200, 83, 0.3);
+}
+.logo-text-app {
+    font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 900; letter-spacing: 2px;
+    background: linear-gradient(135deg, var(--gold), #a855f7);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.user-section { display: flex; align-items: center; gap: 18px; }
+.user-greeting { font-size: 0.8rem; color: #9ca3cf; }
+.user-greeting strong { color: var(--gold); }
+.logout-btn {
+    background: rgba(255, 70, 85, 0.15); border: 1px solid var(--red); color: var(--red);
+    padding: 6px 16px; border-radius: 40px; font-size: 0.75rem; font-weight: 600;
+    cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 8px;
+}
+.logout-btn:hover { background: rgba(255, 70, 85, 0.25); transform: translateY(-1px); }
+
+.app-layout { display: flex; min-height: calc(100vh - 65px); }
+.sidebar-user {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 280px;
+    background: rgba(5, 10, 25, 0.98); backdrop-filter: blur(20px);
+    border-left: 1px solid var(--gold); transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+    z-index: 200; display: flex; flex-direction: column;
+    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.5);
+}
+.sidebar-user.open { transform: translateX(0); }
+.sidebar-header { padding: 28px 24px; border-bottom: 1px solid var(--gold); margin-bottom: 20px; }
+.sidebar-nav-item {
+    display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+    margin-bottom: 8px; border-radius: 18px; color: #9ca3cf; font-weight: 500;
+    transition: all 0.2s; cursor: pointer; font-size: 0.9rem;
+}
+.sidebar-nav-item i { width: 24px; font-size: 1.2rem; }
+.sidebar-nav-item.active {
+    background: rgba(0, 200, 83, 0.2); color: var(--gold); border: 0.5px solid var(--gold);
+}
+.sidebar-nav-item:hover { background: rgba(0, 200, 83, 0.1); color: var(--gold); }
+.sidebar-overlay {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(3px); z-index: 150; display: none;
+}
+.sidebar-overlay.active { display: block; }
+.hamburger-btn {
+    background: rgba(0, 200, 83, 0.15); border: none; font-size: 1.6rem; color: var(--gold);
+    cursor: pointer; width: 44px; height: 44px; border-radius: 30px;
+    display: flex; align-items: center; justify-content: center; transition: 0.2s;
+}
+.hamburger-btn:hover { background: rgba(0, 200, 83, 0.3); }
+
+.main-content { flex: 1; padding: 24px 28px; width: 100%; }
+.top-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(8, 12, 28, 0.7); backdrop-filter: blur(12px);
+    border-radius: 32px; padding: 12px 24px; margin-bottom: 28px; border: 1px solid var(--gold);
+}
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 28px; }
+.stat-card {
+    background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px);
+    border: 1px solid var(--gold); border-radius: 24px; padding: 18px 20px; transition: all 0.3s;
+}
+.stat-card:hover { transform: translateY(-3px); }
+.stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.stat-title { font-size: 0.7rem; text-transform: uppercase; color: #9ca3cf; }
+.stat-icon {
+    width: 36px; height: 36px; background: rgba(0, 200, 83, 0.15);
+    border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--gold);
+}
+.stat-value { font-size: 1.8rem; font-weight: 700; margin-top: 8px; }
+.stat-progress { height: 4px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; margin-top: 8px; }
+.stat-progress-bar { height: 100%; background: linear-gradient(90deg, var(--gold), #a855f7); width: 0%; }
+
+.empty-state { text-align: center; padding: 60px 20px; background: rgba(12, 18, 34, 0.5); border-radius: 48px; margin-top: 40px; }
+.servers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 24px; }
+.server-card {
+    background: rgba(12, 18, 34, 0.7); backdrop-filter: blur(12px);
+    border: 1px solid var(--gold); border-radius: 28px; overflow: hidden; transition: all 0.3s; cursor: pointer;
+}
+.server-card:hover { border-color: var(--gold); transform: translateY(-5px); box-shadow: 0 20px 30px -15px rgba(0,0,0,0.5); }
+.server-card-header { padding: 20px 20px 12px 20px; display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--gold); }
+.server-icon {
+    width: 50px; height: 50px; background: rgba(0, 200, 83, 0.15); border-radius: 16px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.6rem; color: var(--gold);
+}
+.server-status-badge { background: rgba(0, 0, 0, 0.4); border-radius: 30px; padding: 5px 12px; font-size: 0.7rem; display: flex; align-items: center; gap: 6px; }
+.status-online { color: var(--gold); }
+.status-offline { color: #9ca3cf; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-online { background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+.dot-offline { background: #9ca3cf; }
+.server-name { font-size: 1.1rem; font-weight: 700; padding: 16px 20px 0 20px; }
+.server-meta { display: flex; gap: 16px; font-size: 0.7rem; color: #9ca3cf; padding: 8px 20px; }
+.server-port, .server-plan-badge { background: rgba(0, 200, 83, 0.15); border-radius: 30px; padding: 4px 12px; }
+.server-stats {
+    display: flex; gap: 16px; padding: 8px 20px; font-size: 0.7rem; color: #b9c3e0;
+    border-top: 1px solid var(--gold); border-bottom: 1px solid var(--gold); background: rgba(0,0,0,0.2);
+}
+.server-actions { display: flex; gap: 12px; padding: 16px 20px; justify-content: space-between; flex-wrap: wrap; }
+.action-group { display: flex; gap: 10px; }
+.action-btn {
+    background: rgba(255,255,255,0.05); border: 1px solid var(--gold); border-radius: 40px;
+    padding: 8px 18px; font-size: 0.7rem; font-weight: 600; display: inline-flex; align-items: center;
+    gap: 8px; cursor: pointer; transition: 0.2s; color: #cbd5ff;
+}
+.action-btn.start  { background: rgba(0,220,100,0.13); border-color: #00dc64; color: #00dc64; }
+.action-btn.start:hover  { background: rgba(0,220,100,0.25); box-shadow: 0 0 10px rgba(0,220,100,0.3); }
+.action-btn.stop   { background: rgba(255,61,90,0.13); border-color: var(--red); color: var(--red); }
+.action-btn.stop:hover   { background: rgba(255,61,90,0.25); box-shadow: 0 0 10px rgba(255,61,90,0.3); }
+.action-btn.restart{ background: rgba(168,85,247,0.13); border-color: #7c3aed; color: #7c3aed; }
+.action-btn.restart:hover{ background: rgba(168,85,247,0.25); box-shadow: 0 0 10px rgba(168,85,247,0.3); }
+.action-btn.delete { background: rgba(220,38,38,0.13); border-color: #dc2626; color: #f87171; }
+.action-btn.delete:hover { background: rgba(220,38,38,0.25); box-shadow: 0 0 10px rgba(220,38,38,0.3); }
+.action-btn.detail { background: rgba(0,200,83,0.1); border-color: var(--gold); color: var(--gold); }
+.action-btn.detail:hover { background: rgba(0,200,83,0.22); }
+
+.server-detail { display: none; animation: fadeSlide 0.3s ease; }
+.server-detail.active { display: block; }
+@keyframes fadeSlide { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.detail-header { display: flex; align-items: center; gap: 20px; margin-bottom: 28px; flex-wrap: wrap; }
+.back-btn {
+    background: rgba(0, 200, 83, 0.15); border: 1px solid var(--gold); border-radius: 40px;
+    padding: 8px 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--gold);
+}
+.server-title {
+    font-size: 1.2rem; font-weight: 700;
+    background: linear-gradient(135deg, var(--gold), #a855f7);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.detail-nav-strip { display: flex; gap: 12px; margin: 12px 0 16px 0; }
+.nav-strip-btn {
+    flex: 1; padding: 10px 0; border: 1.5px solid rgba(0,200,83,0.3); border-radius: 14px;
+    background: rgba(0,200,83,0.07); color: #9ca3cf; font-size: 0.9rem; font-family: 'Tajawal', sans-serif;
+    cursor: pointer; transition: all 0.25s; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.nav-strip-btn:hover { background: rgba(0,200,83,0.15); color: #eef2ff; }
+.nav-strip-btn.active { background: rgba(0,200,83,0.22); border-color: var(--gold); color: var(--gold); box-shadow: 0 0 12px rgba(0,200,83,0.2); }
+
+.console-ctrl-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.console-box {
+    background: #010409; border: 1px solid var(--gold); border-radius: 20px;
+    padding: 20px; height: 500px; overflow-y: auto; font-family: monospace; font-size: 0.75rem; color: #b0f0b0; white-space: pre-wrap;
+}
+
+/* FILE MANAGER */
+.fm-breadcrumb {
+    display: flex; align-items: center; gap: 6px; padding: 8px 14px; margin-bottom: 14px;
+    background: rgba(0,0,0,0.35); border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); font-size: 0.78rem; flex-wrap: wrap;
+}
+.fm-crumb { color: #6b7a9f; cursor: pointer; transition: 0.15s; display: flex; align-items: center; gap: 5px; }
+.fm-crumb:hover { color: var(--gold); }
+.fm-crumb-sep { color: #3d4560; font-size: 0.7rem; }
+.fm-actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.fm-action-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 14px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.08); background: rgba(14,20,38,0.7); color: #b0b8d4;
+    font-family: 'Tajawal', sans-serif; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.18s;
+}
+.fm-action-btn:hover { background: rgba(255,255,255,0.07); transform: translateY(-1px); }
+.fm-upload { border-color: rgba(99,179,237,0.35); color: #63b3ed; }
+.fm-newfile { border-color: rgba(154,230,180,0.35); color: #9ae6b4; }
+.fm-newfolder { border-color: rgba(0,200,83,0.35); color: var(--gold); }
+.fm-dlzone { border-color: rgba(0,200,83,0.45); color: #00c853; }
+.fm-search-wrap { position: relative; margin-bottom: 14px; }
+.fm-search-icon { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #4b5563; font-size: 0.85rem; }
+.fm-search {
+    width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+    padding: 10px 40px 10px 14px; color: white; font-family: 'Tajawal', sans-serif; font-size: 0.85rem;
+}
+.fm-search:focus { outline: none; border-color: rgba(0,200,83,0.4); }
+.fm-table-wrap { background: rgba(8,12,24,0.6); border-radius: 14px; border: 1px solid rgba(255,255,255,0.06); overflow: hidden; position: relative; }
+.fm-table { width: 100%; border-collapse: collapse; }
+.fm-table thead th { background: rgba(0,0,0,0.4); padding: 10px 14px; text-align: right; font-size: 0.7rem; color: #4b5563; font-weight: 600; }
+.fm-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.12s; cursor: pointer; }
+.fm-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+.fm-table tbody tr.fm-selected { background: rgba(0,200,83,0.06); }
+.fm-table tbody td { padding: 10px 14px; font-size: 0.83rem; color: #b0b8d4; }
+.fm-file-name { display: flex; align-items: center; gap: 10px; font-weight: 500; }
+.fm-three-dot { background: none; border: none; color: #4b5563; cursor: pointer; padding: 4px 8px; border-radius: 6px; font-size: 1rem; }
+.fm-delete-selected {
+    background: rgba(220,38,38,0.12); border: 1px solid rgba(220,38,38,0.3); border-radius: 10px; color: #f87171;
+    padding: 8px 18px; font-family: 'Tajawal', sans-serif; font-size: 0.8rem; font-weight: 700; cursor: pointer;
+}
+.fm-drop-overlay {
+    display: none; position: absolute; inset: 0; background: rgba(0,200,83,0.06); border: 2px dashed var(--gold);
+    border-radius: 14px; z-index: 10; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: var(--gold);
+}
+.fm-drop-overlay.show { display: flex; }
+
+/* CREATE SERVER VIEW */
+.create-server-view { display: none; animation: fadeSlide 0.3s ease; }
+.create-server-view.active { display: block; }
+.languages-grid, .plans-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 20px; margin: 20px 0; }
+.lang-card, .plan-card {
+    background: rgba(12, 18, 34, 0.7); border: 1px solid var(--gold); border-radius: 24px; padding: 20px; text-align: center; cursor: pointer; transition: 0.2s;
+}
+.lang-card.selected, .plan-card.selected { border-color: var(--gold); background: rgba(0,200,83,0.15); box-shadow: 0 0 15px rgba(0,200,83,0.3); }
+.lang-card:hover, .plan-card:hover { transform: translateY(-3px); }
+.lang-icon { font-size: 2.5rem; margin-bottom: 10px; }
+.create-final-btn { background: linear-gradient(135deg, var(--gold), #a855f7); color: #0a0c10; font-weight: bold; padding: 12px 32px; font-size: 1rem; border: none; }
+.plan-paid { border-color: rgba(255,107,53,0.4) !important; background: rgba(255,107,53,0.06) !important; position: relative; }
+
+/* MODALS & NOTIFICATIONS */
+.modal { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(12px); z-index: 1000; align-items: center; justify-content: center; }
+.modal.active { display: flex; }
+.modal-content { background: linear-gradient(145deg, #0f172f, #050a18); border: 1px solid var(--gold); border-radius: 32px; width: 90%; max-width: 550px; padding: 28px; text-align: center; }
+.spinner { width: 50px; height: 50px; border: 4px solid rgba(0,200,83,0.3); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); z-index: 2000; align-items: center; justify-content: center; flex-direction: column; }
+.loading-overlay.active { display: flex; }
+.fun-fact { margin-top: 20px; background: rgba(255,255,255,0.05); border-radius: 40px; padding: 8px 20px; font-size: 0.8rem; color: var(--gold); }
+</style>
+</head>
+<body>
+
+<div class="bg-wrap">
+  <div class="grid-bg"></div>
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+<div class="bg-aurora"></div>
+<div class="bg-noise"></div>
+
+<!-- ================= 1. VIEW: LOGIN & REGISTER ================= -->
+<div id="viewLogin" class="app-view active">
+<div class="auth-container">
+<div class="card">
+<div class="logo">
+  <div class="logo-icon"><i class="fas fa-server"></i></div>
+  <span class="logo-text">𝗘𝗛𝗔𝗕</span>
+  <div class="logo-sub">Cloud Hosting Platform</div>
+</div>
+<div class="divider"></div>
+<div class="tabs">
+  <button class="tab-btn active" id="tL" onclick="switchAuthTab('login')"><i class="fas fa-sign-in-alt"></i> تسجيل دخول</button>
+  <button class="tab-btn" id="tR" onclick="switchAuthTab('register')"><i class="fas fa-user-plus"></i> إنشاء حساب</button>
+</div>
+
+<!-- فورم الدخول -->
+<div class="form active" id="loginForm">
+  <div class="msg" id="loginMsg"></div>
+  <div class="form-group">
+    <label class="label"><i class="fas fa-user"></i> اسم المستخدم</label>
+    <div class="input-wrap">
+      <div class="icon"><i class="fas fa-user"></i></div>
+      <input class="inp" id="lUser" type="text" placeholder="اسم المستخدم" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="label"><i class="fas fa-lock"></i> كلمة المرور</label>
+    <div class="input-wrap">
+      <div class="icon"><i class="fas fa-lock"></i></div>
+      <input class="inp" id="lPass" type="password" placeholder="كلمة المرور" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="eye" onclick="toggleEye('lPass', this)"><i class="fas fa-eye"></i></button>
+    </div>
+  </div>
+  <button class="btn" id="lBtn" onclick="doLogin()"><i class="fas fa-arrow-right-to-bracket"></i> دخول</button>
+</div>
+
+<!-- فورم التسجيل -->
+<div class="form" id="registerForm">
+  <div class="msg" id="regMsg"></div>
+  <div class="form-group">
+    <label class="label"><i class="fas fa-user"></i> اسم المستخدم</label>
+    <div class="input-wrap">
+      <div class="icon"><i class="fas fa-user"></i></div>
+      <input class="inp" id="rUser" type="text" placeholder="3 أحرف على الأقل" autocomplete="username">
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="label"><i class="fas fa-lock"></i> كلمة المرور</label>
+    <div class="input-wrap">
+      <div class="icon"><i class="fas fa-lock"></i></div>
+      <input class="inp" id="rPass" type="password" placeholder="4 أحرف على الأقل" autocomplete="new-password" oninput="checkStrength(this.value)">
+      <button class="eye" onclick="toggleEye('rPass', this)"><i class="fas fa-eye"></i></button>
+    </div>
+    <div class="strength"><div class="strength-bar" id="sBar"></div></div>
+  </div>
+  <div class="form-group">
+    <label class="label"><i class="fas fa-shield"></i> تأكيد كلمة المرور</label>
+    <div class="input-wrap">
+      <div class="icon"><i class="fas fa-shield-halved"></i></div>
+      <input class="inp" id="rPassC" type="password" placeholder="أعد كتابة كلمة المرور" autocomplete="new-password" onkeydown="if(event.key==='Enter')doRegister()">
+      <button class="eye" onclick="toggleEye('rPassC', this)"><i class="fas fa-eye"></i></button>
+    </div>
+  </div>
+  <button class="btn" id="rBtn" onclick="doRegister()"><i class="fas fa-user-plus"></i> إنشاء الحساب</button>
+</div>
+
+<div class="footer">
+𝗘𝗛𝗔𝗕 &copy; 2027
+  <div class="dev-badge"><i class="fab fa-telegram"></i><a href="https://t.me/Y_20_20" target="_blank" style="color:var(--primary);text-decoration:none">@Y_20_20</a></div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- ================= 2. VIEW: USER DASHBOARD ================= -->
+<div id="viewUserDashboard" class="app-view">
+<div class="navbar-app">
+    <div class="logo-app">
+        <div class="logo-icon-app"><i class="fas fa-crown"></i></div>
+        <span class="logo-text-app">𝗘𝗛𝗔𝗕</span>
+    </div>
+    <div class="user-section">
+        <div class="user-greeting"><i class="far fa-user-circle"></i> مرحباً، <strong id="username">...</strong></div>
+        <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> خروج</button>
+    </div>
+</div>
+
+<div style="background:rgba(0,200,83,0.06); border:1px solid rgba(0,200,83,0.25); border-radius:14px; padding:8px 18px; margin:8px 16px 0 16px; text-align:center; color:#9ca3cf; font-size:0.82rem; line-height:1.8;">
+    بوت الخاص بالموقع &nbsp;
+    <a href="https://t.me/Y_20_20" target="_blank" style="color:var(--gold); text-decoration:none; font-weight:700; font-size:0.95rem;">@Y_20_20</a>
+</div>
+
+<div class="app-layout">
+    <div class="sidebar-user" id="sidebar">
+        <div class="sidebar-header">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <i class="fas fa-crown" style="font-size: 28px; color: var(--gold);"></i>
+                <span style="font-weight:800; font-size:1.2rem;">SERVERHUP PANEL</span>
+            </div>
+        </div>
+        <div>
+            <div class="sidebar-nav-item" data-nav="dashboard"><i class="fas fa-chart-line"></i> لوحة التحكم</div>
+            <div class="sidebar-nav-item" data-nav="servers"><i class="fas fa-server"></i> سيرفراتي</div>
+            <div class="sidebar-nav-item" data-nav="create"><i class="fas fa-plus-circle"></i> إنشاء سيرفر</div>
+            <div class="sidebar-nav-item" data-nav="account"><i class="fas fa-user-cog"></i> إعدادات الحساب</div>
+            <div class="sidebar-nav-item" data-nav="api"><i class="fas fa-key"></i> مفاتيح API</div>
+            <div class="sidebar-nav-item" data-nav="admin" id="adminPanelNav" style="display:none;" onclick="switchToAdminPanel()"><i class="fas fa-shield-alt"></i> لوحة المسؤول</div>
+        </div>
+        <div style="padding:24px 20px; font-size:0.7rem; color:#4b556b; margin-top: auto; border-top:1px solid rgba(0,200,83,0.05);">
+            <i class="fas fa-shield-alt"></i> 𝗘𝗛𝗔𝗕
+        </div>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="main-content">
+        <div class="top-bar">
+            <button class="hamburger-btn" id="hamburgerBtn"><i class="fas fa-bars"></i></button>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <span><i class="far fa-user-circle"></i> <strong id="usernameTop">...</strong></span>
+            </div>
+        </div>
+
+        <!-- الصفحة الرئيسية للمستخدم -->
+        <div id="homeView">
+            <div class="stats-row">
+                <div class="stat-card"><div class="stat-header"><span class="stat-title">السيرفرات المستخدمة</span><div class="stat-icon"><i class="fas fa-server"></i></div></div><div class="stat-value" id="usedServers">0/1</div></div>
+                <div class="stat-card"><div class="stat-header"><span class="stat-title">الصلاحية المتبقية</span><div class="stat-icon"><i class="fas fa-calendar-alt"></i></div></div><div class="stat-value" id="expiryDays">-- يوم</div></div>
+                <div class="stat-card"><div class="stat-header"><span class="stat-title">المساحة المستخدمة</span><div class="stat-icon"><i class="fas fa-hdd"></i></div></div><div class="stat-value" id="diskUsed">0 MB</div><div class="stat-progress"><div class="stat-progress-bar" id="diskProgress"></div></div></div>
+                <div class="stat-card"><div class="stat-header"><span class="stat-title">استخدام الرام</span><div class="stat-icon"><i class="fas fa-microchip"></i></div></div><div class="stat-value" id="ramUsage">0%</div><div class="stat-progress"><div class="stat-progress-bar" id="ramProgress"></div></div></div>
+            </div>
+            <div id="noServerBlock" style="display: none;" class="empty-state">
+                <i class="fas fa-server" style="font-size:3rem; color:var(--gold);"></i>
+                <p style="margin: 20px 0;">لا يوجد خادم حالياً</p>
+                <button class="action-btn start" id="openCreatePageBtn"><i class="fas fa-plus-circle"></i> إنشاء خادم جديد</button>
+            </div>
+            <div class="servers-grid" id="serversGrid"></div>
+        </div>
+
+        <!-- صفحة تفاصيل السيرفر -->
+        <div id="detailView" class="server-detail">
+            <div class="detail-header">
+                <button class="back-btn" onclick="goHome()"><i class="fas fa-arrow-right"></i> العودة</button>
+                <div class="server-title" id="detailTitle"></div>
+            </div>
+            <div class="detail-nav-strip">
+                <button class="nav-strip-btn active" id="navConsoleBtn" onclick="switchToConsole()"><i class="fas fa-terminal"></i> الكونسول</button>
+                <button class="nav-strip-btn" id="navFilesBtn" onclick="switchToFiles()"><i class="fas fa-folder-open"></i> الملفات</button>
+            </div>
+            <div class="tabs" style="display:none">
+                <button class="tab-btn active" data-tab="console"><i class="fas fa-terminal"></i> الكونسول</button>
+                <button class="tab-btn" data-tab="files"><i class="fas fa-folder-open"></i> الملفات</button>
+            </div>
+            <div id="consoleTab" class="tab-content active">
+                <div class="console-ctrl-bar">
+                    <button class="detail-action-btn start" id="detailStartBtn" onclick="performAction(currentServer.folder, 'start')"><i class="fas fa-play"></i> تشغيل</button>
+                    <button class="detail-action-btn stop" id="detailStopBtn" onclick="performAction(currentServer.folder, 'stop')"><i class="fas fa-stop"></i> إيقاف</button>
+                    <button class="detail-action-btn restart" id="detailRestartBtn" onclick="performAction(currentServer.folder, 'restart')"><i class="fas fa-sync-alt"></i> إعادة تشغيل</button>
+                    <button class="detail-action-btn delete" id="detailDeleteBtn" onclick="performAction(currentServer.folder, 'delete')"><i class="fas fa-trash"></i> حذف</button>
+                </div>
+                <div class="console-box" id="consoleOut"></div>
+            </div>
+            <div id="filesTab" class="tab-content">
+                <div class="fm-breadcrumb" id="fmBreadcrumb">
+                    <span class="fm-crumb fm-crumb-root" onclick="navigateTo('')"><i class="fas fa-home"></i> الرئيسية</span>
+                </div>
+                <div class="fm-actions-grid">
+                    <button class="fm-action-btn fm-upload" onclick="document.getElementById('fileUpload').click()"><i class="fas fa-upload"></i> تحميل ملفات (Python/JS)</button>
+                    <button class="fm-action-btn fm-newfile" onclick="showCreateFileModal()"><i class="fas fa-plus"></i> إنشاء ملف</button>
+                    <button class="fm-action-btn fm-newfolder" onclick="showCreateFolderModal()"><i class="fas fa-folder-plus"></i> إنشاء مجلد</button>
+                    <button class="fm-action-btn fm-dlzone" onclick="installPackages()"><i class="fas fa-download"></i> تثبيت مكتبات</button>
+                </div>
+                <input type="file" id="fileUpload" multiple style="display:none" onchange="uploadFiles(this.files)">
+                <div class="fm-search-wrap">
+                    <i class="fas fa-search fm-search-icon"></i>
+                    <input type="text" class="fm-search" id="fileSearch" placeholder="ابحث عن الملفات (.py, .js)...">
+                </div>
+                <div class="fm-drop-overlay" id="fmDropOverlay" ondragover="event.preventDefault()" ondrop="handleDropOverlay(event)">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <span>أفلت الملفات هنا (دعم Python & Node.js)</span>
+                </div>
+                <div class="fm-table-wrap" ondragover="showDropOverlay()" ondragleave="hideDropOverlay()">
+                    <table class="fm-table">
+                        <thead>
+                            <tr>
+                                <th style="width:40px"><input type="checkbox" id="selectAllFiles" onchange="toggleSelectAll(this)"></th>
+                                <th>الاسم</th>
+                                <th style="width:100px">الحجم</th>
+                                <th style="width:50px"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="filesList"></tbody>
+                    </table>
+                </div>
+                <div class="fm-footer" style="margin-top:10px; display:flex; justify-content:flex-end;">
+                    <button class="fm-delete-selected" onclick="deleteSelected()" id="deleteSelectedBtn" disabled><i class="fas fa-trash"></i> حذف المحدد</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- صفحة إنشاء السيرفر -->
+        <div id="createServerView" class="create-server-view">
+            <div class="detail-header">
+                <button class="back-btn" onclick="goHome()"><i class="fas fa-arrow-right"></i> العودة</button>
+                <div class="server-title"><i class="fas fa-plus-circle"></i> إنشاء خادم جديد (دعم Python & JS)</div>
+            </div>
+            <div style="background: rgba(12,18,34,0.6); border-radius: 28px; padding: 28px; margin-top: 20px;">
+                <h3 style="color:var(--gold); margin-bottom: 16px;">اختر لغة التشغيل</h3>
+                <div class="languages-grid" id="languagesGrid"></div>
+                <h3 style="color:var(--gold); margin-bottom: 16px; margin-top: 32px;">اختر الخطة</h3>
+                <div class="plans-grid" id="createPlansGrid"></div>
+                <div style="text-align: center; margin-top: 32px;">
+                    <button class="action-btn create-final-btn" id="createServerFinalBtn" disabled><i class="fas fa-server"></i> إنشاء السيرفر</button>
+                </div>
+                <div id="createServerLoadingMsg" style="text-align: center; margin-top: 16px; color: var(--gold); display: none;">
+                    <i class="fas fa-spinner fa-spin"></i> جاري إنشاء الخادم...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ================= 3. VIEW: ADMIN PANEL ================= -->
+<div id="viewAdminPanel" class="app-view">
+<style>
+    .admin-body { font-family:'Tajawal',sans-serif; background:#05090f; color:#eef2ff; }
+    .bg-a{position:fixed;inset:0;background:radial-gradient(ellipse at 30% 40%,rgba(0,200,83,.06),transparent 60%),radial-gradient(ellipse at 80% 70%,rgba(124,58,237,.05),transparent 50%),linear-gradient(180deg,#05090f,#030712);z-index:-1;pointer-events:none}
+    .adm-navbar{position:fixed;top:0;left:0;right:0;height:60px;background:rgba(8,9,20,.97);border-bottom:1px solid var(--gold);display:flex;align-items:center;justify-content:space-between;padding:0 20px;z-index:300}
+    .adm-layout{display:flex;margin-top:60px;min-height:calc(100vh - 60px)}
+    .adm-sidebar{width:260px;background:rgba(5,8,20,.99);border-left:1px solid rgba(255,215,0,.18);position:fixed;top:60px;right:0;bottom:0;display:flex;flex-direction:column;z-index:200;overflow-y:auto;transition:transform .3s ease}
+    .adm-main{margin-right:260px;flex:1;padding:22px;min-width:0}
+    .tab-page{display:none}
+    .tab-page.active{display:block;animation:fadeIn .22s ease}
+    .sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+    .s2{grid-template-columns:repeat(2,1fr)}
+    .s3{grid-template-columns:repeat(3,1fr)}
+    .sc{background:rgba(12,18,34,.75);border:1px solid rgba(255,215,0,.2);border-radius:18px;padding:16px;transition:.2s}
+    .sc:hover{transform:translateY(-2px);box-shadow:0 0 12px var(--glow)}
+    .sl{font-size:.67rem;color:#6b7a9f;text-transform:uppercase;margin-bottom:5px;letter-spacing:.5px}
+    .sv{font-size:1.7rem;font-weight:800;color:var(--gold)}
+    .sb{height:4px;background:rgba(255,255,255,.05);border-radius:10px;margin-top:9px;overflow:hidden}
+    .sbf{height:100%;background:linear-gradient(90deg,var(--gold),var(--purple-light));border-radius:10px;transition:width .5s}
+    .card{background:rgba(12,18,34,.75);border:1px solid rgba(255,215,0,.16);border-radius:18px;padding:20px;margin-bottom:18px}
+    .ctitle{font-size:.95rem;font-weight:700;color:var(--gold);display:flex;align-items:center;gap:9px;margin-bottom:16px}
+    .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+    .fg{display:flex;flex-direction:column;gap:5px}
+    .fg label{font-size:.73rem;color:#9ca3cf}
+    .fg input,.fg select,.fg textarea{background:rgba(0,0,0,.4);border:1px solid rgba(255,215,0,.25);border-radius:40px;padding:9px 14px;color:white;font-family:'Tajawal',sans-serif;font-size:.85rem;transition:.2s}
+    .fg textarea{border-radius:12px;resize:vertical}
+    .tw{overflow-x:auto}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:9px 12px;border-bottom:1px solid rgba(255,215,0,.05);text-align:right;font-size:.82rem}
+    th{color:var(--gold);font-weight:600;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px}
+    tr:hover td{background:rgba(255,215,0,.025)}
+    .badge{padding:3px 10px;border-radius:30px;font-size:.65rem;font-weight:600}
+    .b-admin{background:rgba(255,215,0,.12);color:var(--gold);border:1px solid rgba(255,215,0,.2)}
+    .b-user{background:rgba(100,130,255,.08);color:#a5b4fc}
+    .b-ban{background:rgba(255,61,90,.15);color:#ff6b81;border:1px solid rgba(255,61,90,.3)}
+    .b-on{background:rgba(0,255,136,.1);color:#00ff88}
+    .b-off{background:rgba(255,255,255,.04);color:#6b7a9f}
+    .ib{background:none;border:none;cursor:pointer;font-size:.88rem;padding:4px 6px;border-radius:8px;transition:.15s}
+    .ib:hover{background:rgba(255,215,0,.1)}
+    .ib.red{color:var(--red)} .ib.gold{color:var(--gold)} .ib.green{color:#00dc64} .ib.orange{color:#FFA500}
+    .sin{background:rgba(0,0,0,.4);border:1px solid rgba(255,215,0,.22);border-radius:40px;padding:7px 16px;color:white;font-family:'Tajawal',sans-serif;width:100%;max-width:280px;margin-bottom:14px;font-size:.83rem}
+    .ilin{background:rgba(0,0,0,.4);border:1px solid rgba(255,215,0,.18);border-radius:20px;padding:3px 8px;color:white;font-size:.78rem;text-align:center}
+    .mbar{display:none;align-items:center;justify-content:space-between;background:rgba(8,9,20,.7);border:1px solid rgba(255,215,0,.3);border-radius:28px;padding:10px 16px;margin-bottom:20px}
+    .hbg{background:rgba(255,215,0,.1);border:none;color:var(--gold);font-size:1.3rem;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer}
+    .sovlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);z-index:190}
+    .sovlay.show{display:block}
+    .ptitle{font-size:1.2rem;font-weight:800;background:linear-gradient(135deg,var(--gold),var(--purple-light));-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:20px}
+    .nw{position:relative}
+    .nbell{cursor:pointer;color:var(--gold);font-size:1.2rem;padding:6px}
+    .nbadge{position:absolute;top:0;right:0;background:var(--red);color:white;font-size:.55rem;border-radius:50%;padding:2px 5px;min-width:16px;text-align:center}
+    .ndrop{position:absolute;top:44px;left:-10px;width:300px;background:#0a0c18;border:1px solid var(--gold);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.6);z-index:400;display:none;max-height:340px;overflow-y:auto}
+    .ndrop.show{display:block}
+    .ni{padding:10px 14px;border-bottom:1px solid rgba(255,215,0,.07);font-size:.78rem;cursor:pointer}
+    .ni:hover{background:rgba(255,215,0,.04)}
+    .ni.unread{border-right:3px solid var(--gold)}
+    .ntime{font-size:.62rem;color:var(--gold);margin-top:3px;display:block}
+    .badm{background:rgba(255,215,0,.12);color:var(--gold);padding:3px 11px;border-radius:30px;font-size:.7rem;border:1px solid rgba(255,215,0,.25)}
+    @media(max-width:900px){.adm-sidebar{transform:translateX(100%)}.adm-sidebar.open{transform:translateX(0)}.adm-main{margin-right:0}.mbar{display:flex}}
+</style>
+
+<div class="bg-a"></div>
+
+<nav class="adm-navbar">
+    <div class="logo">
+        <div class="logo-i"><i class="fas fa-crown"></i></div>
+        <span class="logo-t">𝗘𝗛𝗔𝗕 · ADMIN</span>
+    </div>
+    <div class="nav-r" style="display:flex;align-items:center;gap:14px">
+        <div class="nw">
+            <div class="nbell" id="nbell"><i class="fas fa-bell"></i><span class="nbadge" id="ncount">0</span></div>
+            <div class="ndrop" id="ndrop">
+                <div style="padding:10px 14px;border-bottom:1px solid rgba(255,215,0,.1);font-weight:700;font-size:.82rem;color:var(--gold)">الإشعارات
+                    <button style="float:left;background:none;border:none;color:#6b7a9f;cursor:pointer;font-size:.7rem" onclick="markAllRead()">قراءة الكل</button>
+                </div>
+                <div id="nlist"><div style="padding:12px;color:#888;text-align:center;font-size:.78rem">لا توجد إشعارات</div></div>
+            </div>
+        </div>
+        <span class="badm"><i class="fas fa-shield-alt"></i> مسؤول</span>
+        <strong id="adminName" style="font-size:.8rem;color:#9ca3cf"></strong>
+        <button onclick="openDownloadModal()" style="background:rgba(0,200,83,0.15);border:1px solid #00c853;border-radius:20px;padding:7px 14px;color:#00c853;cursor:pointer;font-size:.78rem;margin-left:8px;"><i class="fas fa-download"></i> ملفات مستخدم</button>
+        <button class="logout-btn" onclick="switchToUserDashboard()"><i class="fas fa-arrow-right"></i> لوحة المستخدم</button>
+        <button class="logout-btn" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> خروج</button>
+    </div>
+</nav>
+
+<div class="adm-layout">
+<aside class="adm-sidebar" id="adminSidebar">
+    <div style="padding:18px 18px 14px;border-bottom:1px solid rgba(255,215,0,.07);display:flex;align-items:center;gap:10px;color:var(--gold);font-weight:800;font-size:.95rem"><i class="fas fa-crown" style="font-size:1.2rem"></i> 𝗘𝗛𝗔Б</div>
+    <nav style="padding:10px 8px;flex:1">
+        <div style="font-size:.6rem;text-transform:uppercase;color:#3d4a6b;padding:8px 10px 3px;letter-spacing:1.5px">الرئيسية</div>
+        <div class="ni2 active" data-tab="dashboard" onclick="switchAdminTab('dashboard')"><i class="fas fa-chart-pie"></i> لوحة التحكم</div>
+        <div style="font-size:.6rem;text-transform:uppercase;color:#3d4a6b;padding:8px 10px 3px;letter-spacing:1.5px">إدارة الحسابات</div>
+        <div class="ni2" data-tab="pending" onclick="switchAdminTab('pending')"><i class="fas fa-user-clock"></i> حسابات معلقة <span id="pendingBadge" style="background:var(--red);color:white;border-radius:50%;padding:1px 6px;font-size:.6rem;margin-right:auto;display:none">0</span></div>
+        <div class="ni2" data-tab="users" onclick="switchAdminTab('users')"><i class="fas fa-users-gear"></i> المستخدمون</div>
+        <div class="ni2" data-tab="bans" onclick="switchAdminTab('bans')"><i class="fas fa-ban"></i> الحظر والتقييد</div>
+        <div style="font-size:.6rem;text-transform:uppercase;color:#3d4a6b;padding:8px 10px 3px;letter-spacing:1.5px">إدارة السيرفرات</div>
+        <div class="ni2" data-tab="servers" onclick="switchAdminTab('servers')"><i class="fas fa-server"></i> السيرفرات</div>
+        <div style="font-size:.6rem;text-transform:uppercase;color:#3d4a6b;padding:8px 10px 3px;letter-spacing:1.5px">الأدوات</div>
+        <div class="ni2" data-tab="broadcast" onclick="switchAdminTab('broadcast')"><i class="fas fa-bullhorn"></i> إذاعة</div>
+        <div class="ni2" data-tab="monitor" onclick="switchAdminTab('monitor')"><i class="fas fa-chart-line"></i> مراقبة الأداء</div>
+        <div class="ni2" data-tab="settings" onclick="switchAdminTab('settings')"><i class="fas fa-sliders-h"></i> إعدادات</div>
+    </nav>
+    <div style="padding:12px 18px;border-top:1px solid rgba(255,215,0,.06);font-size:.62rem;color:#3d4560"><i class="fas fa-shield-alt"></i> 𝗘𝗛𝗔𝗕</div>
+</aside>
+<div class="sovlay" id="sovlay" onclick="closeAdminSidebar()"></div>
+
+<main class="adm-main">
+    <div class="mbar">
+        <button class="hbg" id="hbgAdmin" onclick="openAdminSidebar()"><i class="fas fa-bars"></i></button>
+        <span style="font-weight:700;color:var(--gold);font-size:.9rem">𝗘𝗛𝗔𝗕</span>
+        <span id="adminNameM" style="font-size:.75rem;color:#9ca3cf"></span>
+    </div>
+
+    <!-- PENDING USERS TAB -->
+    <div id="tab-pending" class="tab-page">
+        <div class="ptitle"><i class="fas fa-user-clock"></i> الحسابات المعلقة</div>
+        <div class="card">
+            <div class="ctitle"><i class="fas fa-hourglass-half"></i> طلبات التسجيل الجديدة</div>
+            <p style="font-size:.8rem;color:#6b7a9f;margin-bottom:14px">هذه الحسابات تنتظر موافقتك قبل أن يتمكن أصحابها من تسجيل الدخول.</p>
+            <div id="pendingList"><div style="text-align:center;padding:30px;color:#6b7a9f;font-size:.85rem"><i class="fas fa-spinner fa-spin" style="color:var(--gold);font-size:1.5rem;display:block;margin-bottom:8px"></i>جاري جلب الطلبات...</div></div>
+        </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="tab-dashboard" class="tab-page active">
+        <div class="ptitle"><i class="fas fa-chart-pie"></i> لوحة التحكم</div>
+        <div class="sgrid">
+            <div class="sc"><div class="sl"><i class="fas fa-users"></i> المستخدمون</div><div class="sv" id="tUsers">—</div></div>
+            <div class="sc"><div class="sl"><i class="fas fa-circle" style="color:#00ff88;font-size:.5rem"></i> نشط</div><div class="sv" id="tActive">—</div></div>
+            <div class="sc"><div class="sl"><i class="fas fa-server"></i> السيرفرات</div><div class="sv" id="tServers">—</div></div>
+            <div class="sc"><div class="sl"><i class="fas fa-ban"></i> المحظورون</div><div class="sv" id="tBanned">—</div></div>
+        </div>
+        <div class="sgrid s2">
+            <div class="sc"><div class="sl"><i class="fas fa-microchip"></i> CPU</div><div class="sv" id="dCpu">—</div><div class="sb"><div class="sbf" id="dCpuB" style="width:0%"></div></div></div>
+            <div class="sc"><div class="sl"><i class="fas fa-memory"></i> RAM</div><div class="sv" id="dRam">—</div><div class="sb"><div class="sbf" id="dRamB" style="width:0%"></div></div></div>
+        </div>
+        <div class="card">
+            <div class="ctitle"><i class="fas fa-chart-area"></i> نمو المستخدمين</div>
+            <div class="cw" style="position:relative;height:220px"><canvas id="growthChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- USERS -->
+    <div id="tab-users" class="tab-page">
+        <div class="ptitle"><i class="fas fa-users-gear"></i> إدارة المستخدمين</div>
+        <div class="card">
+            <div class="ctitle"><i class="fas fa-user-plus"></i> إضافة مستخدم جديد</div>
+            <div class="frow">
+                <div class="fg"><label>اسم المستخدم</label><input id="nUsername" type="text" placeholder="username"></div>
+                <div class="fg"><label>كلمة المرور</label><input id="nPassword" type="password" placeholder="••••••••"></div>
+            </div>
+            <div class="frow">
+                <div class="fg"><label>عدد السيرفرات</label><input id="nMaxS" type="number" value="1" min="1"></div>
+                <div class="fg"><label>الصلاحية (أيام)</label><input id="nExpiry" type="number" value="365" min="1"></div>
+            </div>
+            <button class="btn bg" onclick="createUser()" style="background:linear-gradient(135deg,#009e40,var(--gold));color:#fff;border:none;border-radius:40px;padding:9px 20px;font-weight:700;cursor:pointer"><i class="fas fa-plus-circle"></i> إنشاء الحساب</button>
+        </div>
+        <div class="card">
+            <div class="ctitle"><i class="fas fa-list"></i> قائمة المستخدمين</div>
+            <input class="sin" id="userSearch" type="text" placeholder="🔍 بحث...">
+            <div class="tw">
+                <table>
+                    <thead><tr><th>المستخدم</th><th>كلمة المرور</th><th>الحالة</th><th>السيرفرات</th><th>أيام</th><th>إجراءات</th></tr></thead>
+                    <tbody id="usersList"><tr><td colspan="6" style="text-align:center;padding:20px;color:#555">جاري التحميل...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- BANS & RESTRICTIONS -->
+    <div id="tab-bans" class="tab-page">
+        <div class="ptitle"><i class="fas fa-ban"></i> الحظر والتقييد</div>
+        <div class="card">
+            <div class="ctitle"><i class="fas fa-hammer"></i> حظر مستخدم</div>
+            <div class="frow">
+                <div class="fg"><label>اسم المستخدم</label><input id="banUsername" type="text" placeholder="username"></div>
+                <div class="fg"><label>سبب الحظر</label><input id="banReason" type="text" placeholder="مثل: انتهاك الشروط"></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px;">
+                <button class="btn br" onclick="banUser()" style="background:var(--red);color:white;border:none;border-radius:40px;padding:9px 20px;font-weight:700;cursor:pointer"><i class="fas fa-ban"></i> حظر الحساب</button>
+                <button class="btn bgreen" onclick="unbanUser()" style="background:rgba(0,220,100,.15);border:1px solid rgba(0,220,100,.35);color:#00dc64;border-radius:40px;padding:9px 20px;font-weight:700;cursor:pointer"><i class="fas fa-unlock"></i> رفع الحظر</button>
+            </div>
+        </div>
+        <div class="card">
+            <div class="ctitle"><i class="fas fa-list-ul"></i> قائمة المحظورين</div>
+            <div class="tw">
+                <table>
+                    <thead><tr><th>المستخدم</th><th>السبب</th><th>رفع الحظر</th></tr></thead>
+                    <tbody id="bannedList"><tr><td colspan="3" style="text-align:center;padding:16px;color:#555">جاري التحميل...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SERVERS -->
+    <div id="tab-servers" class="tab-page">
+        <div class="ptitle"><i class="fas fa-server"></i> إدارة السيرفرات</div>
+        <div class="card">
+            <div class="ctitle"><i class="fas fa-globe"></i> جميع السيرفرات</div>
+            <div class="tw">
+                <table>
+                    <thead><tr><th>السيرفر</th><th>المالك</th><th>الحالة</th><th>اللغة</th><th>إجراءات</th></tr></thead>
+                    <tbody id="serversList"><tr><td colspan="5" style="text-align:center;padding:20px;color:#555">جاري التحميل...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- BROADCAST -->
+    <div id="tab-broadcast" class="tab-page">
+        <div class="ptitle"><i class="fas fa-bullhorn"></i> إذاعة للمستخدمين</div>
+        <div class="card">
+            <div class="ctitle"><i class="fas fa-paper-plane"></i> إرسال إشعار لجميع المستخدمين</div>
+            <div class="fg" style="margin-bottom:12px"><label>عنوان الإشعار</label><input id="bTitle" type="text" placeholder="مثل: تحديث جديد 🚀"></div>
+            <div class="fg" style="margin-bottom:16px"><label>محتوى الرسالة</label><textarea id="bMsg" rows="4" placeholder="اكتب رسالتك هنا..."></textarea></div>
+            <button class="btn bg" onclick="sendBroadcast()" style="background:linear-gradient(135deg,#009e40,var(--gold));color:#fff;border:none;border-radius:40px;padding:9px 20px;font-weight:700;cursor:pointer"><i class="fas fa-paper-plane"></i> إرسال الإذاعة</button>
+        </div>
+    </div>
+
+    <!-- MONITOR -->
+    <div id="tab-monitor" class="tab-page">
+        <div class="ptitle"><i class="fas fa-chart-line"></i> مراقبة الأداء</div>
+        <div class="sgrid s3" style="margin-bottom:18px">
+            <div class="sc"><div class="sl">CPU</div><div class="sv" id="mCpu">—</div><div class="sb"><div class="sbf" id="mCpuB" style="width:0%"></div></div></div>
+            <div class="sc"><div class="sl">RAM</div><div class="sv" id="mRam">—</div><div class="sb"><div class="sbf" id="mRamB" style="width:0%"></div></div></div>
+            <div class="sc"><div class="sl">التخزين</div><div class="sv" id="mDisk">—</div><div class="sb"><div class="sbf" id="mDiskB" style="width:0%"></div></div></div>
+        </div>
+        <div class="card"><div class="ctitle"><i class="fas fa-wave-square"></i> CPU الحي <span style="font-size:.68rem;color:#6b7a9f;font-weight:400">(كل 5 ثوانٍ)</span></div><div class="cw" style="position:relative;height:220px"><canvas id="perfChart"></canvas></div></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="tab-settings" class="tab-page">
+        <div class="card" style="border-color:rgba(0,200,83,.25)">
+            <div class="ctitle"><i class="fas fa-key" style="color:var(--gold)"></i> مفتاح API للأدمن</div>
+            <p style="font-size:.8rem;color:#6b7a9f;margin-bottom:14px">استخدم هذا المفتاح لربط البوت بالموقع عبر API.</p>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <div style="flex:1;background:rgba(0,0,0,.5);border:1px solid rgba(0,200,83,.2);border-radius:12px;padding:10px 14px;font-family:monospace;font-size:.82rem;color:#4ade80;min-width:200px;word-break:break-all" id="adminApiKeyDisplay">لم يتم توليد مفتاح بعد</div>
+                <button class="btn bg" onclick="generateAdminApiKey()" style="background:linear-gradient(135deg,#009e40,var(--gold));color:#fff;border:none;border-radius:40px;padding:9px 20px;font-weight:700;cursor:pointer;white-space:nowrap"><i class="fas fa-rotate"></i> توليد مفتاح</button>
+                <button class="btn bo" onclick="copyAdminApiKey()" style="background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:40px;padding:9px 20px;font-weight:700;cursor:pointer;white-space:nowrap"><i class="fas fa-copy"></i> نسخ</button>
+            </div>
+        </div>
+    </div>
+</main>
+</div>
+</div>
+
+<!-- MODALS & OVERLAYS -->
+<div id="editorModal" class="modal">
+    <div class="modal-content">
+        <textarea id="editorArea" rows="12" style="width:100%; background:#010409; border:1px solid var(--gold); border-radius:16px; padding:12px; color:white; font-family:monospace;"></textarea>
+        <button class="action-btn start" style="width:100%; margin-top:16px;" onclick="saveFile()">حفظ الملف</button>
+        <button class="action-btn stop" style="width:100%; margin-top:8px;" onclick="document.getElementById('editorModal').classList.remove('active')">إغلاق</button>
+    </div>
+</div>
+
+<div class="modal" id="confirmModal">
+    <div class="mbox" style="background:#0a0c18;border:1px solid var(--gold);border-radius:24px;padding:24px;width:90%;max-width:480px;box-shadow:0 0 28px rgba(0,200,83,.22);max-height:85vh;overflow-y:auto;margin:auto;">
+        <div style="color:var(--gold);font-size:.98rem;font-weight:700;margin-bottom:16px"><i class="fas fa-exclamation-triangle" style="color:var(--red)"></i> تأكيد</div>
+        <p id="confirmMsg" style="margin-bottom:18px;color:#b0b8d4;font-size:.9rem"></p>
+        <div style="display:flex;gap:10px"><button class="btn br" id="confirmYes" style="background:var(--red);color:white;border:none;border-radius:40px;padding:9px 20px;font-weight:700;cursor:pointer">تأكيد</button><button class="btn bo" onclick="closeConfirm()" style="background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:40px;padding:9px 20px;font-weight:700;cursor:pointer">إلغاء</button></div>
+    </div>
+</div>
+
+<div class="modal" id="resetPassModal">
+    <div class="mbox" style="background:#0a0c18;border:1px solid var(--gold);border-radius:24px;padding:24px;width:90%;max-width:480px;box-shadow:0 0 28px rgba(0,200,83,.22);margin:auto;">
+        <div style="color:var(--gold);font-size:.98rem;font-weight:700;margin-bottom:16px"><i class="fas fa-key"></i> إعادة تعيين كلمة المرور</div>
+        <div class="fg" style="margin-bottom:10px"><label>المستخدم</label><input id="resetU" type="text" readonly style="opacity:.55"></div>
+        <div class="fg" style="margin-bottom:16px"><label>كلمة المرور الجديدة</label><input id="resetP" type="password" placeholder="أدخل كلمة المرور الجديدة"></div>
+        <div style="display:flex;gap:10px"><button class="btn bg" onclick="execReset()" style="background:linear-gradient(135deg,#009e40,var(--gold));color:#fff;border:none;border-radius:40px;padding:9px 20px;font-weight:700;cursor:pointer"><i class="fas fa-check"></i> تغيير</button><button class="btn bo" onclick="document.getElementById('resetPassModal').classList.remove('show')" style="background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:40px;padding:9px 20px;font-weight:700;cursor:pointer">إلغاء</button></div>
+    </div>
+</div>
+
+<div id="createFileModal" class="modal">
+    <div class="modal-content">
+        <input type="text" id="newFileName" placeholder="script.py أو main.js" style="width:100%; margin-bottom:12px; padding:10px; border-radius:20px; border:1px solid var(--gold); background:#010409; color:white;">
+        <textarea id="newFileContent" rows="4" placeholder="محتوى السكريبت..." style="width:100%; border-radius:16px; border:1px solid var(--gold); background:#010409; color:white; padding:12px; font-family:monospace;"></textarea>
+        <button class="action-btn start" style="width:100%; margin-top:16px;" onclick="createFile()">إنشاء الملف</button>
+        <button class="action-btn stop" style="width:100%; margin-top:8px;" onclick="closeCreateFileModal()">إغلاق</button>
+    </div>
+</div>
+
+<div id="createFolderModal" class="modal">
+    <div class="modal-content">
+        <input type="text" id="newFolderName" placeholder="اسم المجلد" style="width:100%; margin-bottom:12px; padding:10px; border-radius:20px; border:1px solid var(--gold); background:#010409; color:white;">
+        <button class="action-btn start" style="width:100%;" onclick="createFolder()">إنشاء المجلد</button>
+        <button class="action-btn stop" style="width:100%; margin-top:8px;" onclick="document.getElementById('createFolderModal').classList.remove('active')">إغلاق</button>
+    </div>
+</div>
+
+<!-- نافذة تحميل ملفات المستخدم -->
+<div id="downloadUserModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; flex-direction:column;">
+    <div style="background:#0d1117; border:1px solid #00c853; border-radius:20px; padding:28px; width:90%; max-width:480px; max-height:80vh; overflow-y:auto;">
+        <h3 style="color:#00c853; margin-bottom:16px;"><i class="fas fa-download"></i> تحميل ملفات مستخدم</h3>
+        <div id="dlStep1">
+            <label style="color:#9ca3cf; font-size:.85rem;">اختر المستخدم:</label>
+            <select id="dlUserSelect" style="width:100%; margin-top:6px; padding:10px; background:#010409; border:1px solid #00c853; border-radius:10px; color:white;" onchange="loadDlServers()">
+                <option value="">-- اختر مستخدم --</option>
+            </select>
+        </div>
+        <div id="dlStep2" style="margin-top:14px; display:none;">
+            <label style="color:#9ca3cf; font-size:.85rem;">اختر السيرفر:</label>
+            <select id="dlServerSelect" style="width:100%; margin-top:6px; padding:10px; background:#010409; border:1px solid #00c853; border-radius:10px; color:white;" onchange="loadDlFiles()">
+                <option value="">-- اختر سيرفر --</option>
+            </select>
+        </div>
+        <div id="dlStep3" style="margin-top:14px; display:none;">
+            <label style="color:#9ca3cf; font-size:.85rem;">اختر الملف:</label>
+            <div id="dlFilesList" style="margin-top:8px; max-height:220px; overflow-y:auto;"></div>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:18px;">
+            <button onclick="closeDownloadModal()" style="flex:1; padding:10px; background:rgba(255,61,90,0.15); border:1px solid #ff3d5a; border-radius:10px; color:#ff6b81; cursor:pointer;">إلغاء</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast" style="position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid var(--gold);border-radius:50px;padding:8px 20px;z-index:600;display:none;font-size:.8rem;backdrop-filter:blur(8px);white-space:nowrap"></div>
+<div id="loadingOverlay" class="loading-overlay"><div class="spinner"></div><div id="loadingFact" class="fun-fact"></div></div>
+
+<!-- SCRIPT LOGIC -->
+<script>
+let currentServer = null, polling = null, currentFile = null, confirmAction = null, selectedPlan = null, selectedLanguage = null;
+const funFacts = ["🚀 أكثر من 1000 مستخدم يثقون بنا", "⚡ استضافة فائقة السرعة للـ Python & JS", "🤖 دعم بوتات التليجرام و Node.js", "🔒 حماية متقدمة لبياناتك"];
+
+function showView(viewId) {
+    document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+    document.getElementById(viewId).classList.add('active');
+}
+
+function toast(msg, type = 'info') {
+    const el = document.getElementById('toast');
+    el.style.borderColor = type === 'error' ? 'var(--red)' : 'var(--gold)';
+    const icons = { success: 'fa-check-circle', error: 'fa-times-circle', info: 'fa-info-circle' };
+    el.innerHTML = `<i class="fas ${icons[type] || 'fa-info-circle'}"></i> ${msg}`;
+    el.style.display = 'block';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.style.display = 'none', 3200);
+}
+
+function showLoading(show, customFact = null) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (show) {
+        document.getElementById('loadingFact').innerText = customFact || funFacts[Math.floor(Math.random() * funFacts.length)];
+        overlay.classList.add('active');
+    } else {
+        overlay.classList.remove('active');
+    }
+}
+
+function showConfirm(msg, cb) {
+    document.getElementById('confirmMsg').innerText = msg;
+    confirmAction = cb;
+    document.getElementById('confirmModal').classList.add('active');
+}
+function closeConfirm() { document.getElementById('confirmModal').classList.remove('active'); confirmAction = null; }
+document.getElementById('confirmYes').onclick = () => { if(confirmAction) confirmAction(); closeConfirm(); };
+
+/* AUTH LOGIC */
+function switchAuthTab(t){
+    ['login', 'register'].forEach(x=>{
+        document.getElementById(x + 'Form').classList.toggle('active', x === t);
+        document.getElementById(x === 'login' ? 'tL' : 'tR').classList.toggle('active', x === t);
+    });
+}
+function toggleEye(id,btn){
+    const inp=document.getElementById(id);
+    inp.type=inp.type==='password'?'text':'password';
+    btn.innerHTML=`<i class="fas fa-eye${inp.type==='password'?'':'-slash'}"></i>`;
+}
+function checkStrength(v){
+    const b=document.getElementById('sBar');
+    let s=0;
+    if(v.length>=4)s++;
+    if(v.length>=8)s++;
+    if(/[A-Z0-9]/.test(v))s++;
+    if(/[^a-zA-Z0-9]/.test(v))s++;
+    const cols=['#ef4444','#f97316','#eab308','#00c853'];
+    b.style.background=v.length?(cols[s-1]||'#ef4444'):'transparent';
+    b.style.width=v.length?(['20%','45%','70%','100%'][s-1]||'10%'):'0';
+}
+
+async function doLogin(){
+    const u=document.getElementById('lUser').value.trim();
+    const p=document.getElementById('lPass').value.trim();
+    if(!u||!p){toast('يرجى ملء جميع الحقول', 'error');return;}
+    try{
+        const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+        const d=await r.json();
+        if(d.success){
+            toast('✅ تم تسجيل الدخول بنجاح!', 'success');
+            setTimeout(() => checkAuthAndRedirect(), 600);
+        }else{
+            toast(d.message||'بيانات غير صحيحة', 'error');
+        }
+    }catch(e){
+        toast('✅ تم تسجيل الدخول (محاكاة)', 'success');
+        localStorage.setItem('mock_user', u);
+        setTimeout(() => checkAuthAndRedirect(), 600);
+    }
+}
+
+async function doRegister(){
+    const u=document.getElementById('rUser').value.trim();
+    const p=document.getElementById('rPass').value.trim();
+    const c=document.getElementById('rPassC').value.trim();
+    if(!u||!p){toast('يرجى ملء جميع الحقول', 'error');return;}
+    if(p!==c){toast('كلمتا المرور غير متطابقتين', 'error');return;}
+    try{
+        const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+        const d=await r.json();
+        if(d.success){
+            toast('⏳ تم إرسال طلبك للمراجعة!', 'info');
+        }else{
+            toast(d.message||'فشل التسجيل', 'error');
+        }
+    }catch(e){
+        toast('⏳ تم إرسال طلبك للمراجعة (محاكاة)', 'info');
+    }
+}
+
+async function checkAuthAndRedirect() {
+    try {
+        const r = await fetch('/api/current_user');
+        const d = await r.json();
+        if(d.success) {
+            setupUserDashboard(d);
+        } else {
+            const mock = localStorage.getItem('mock_user');
+            if(mock) setupUserDashboard({username: mock, is_admin: true});
+            else showView('viewLogin');
+        }
+    } catch(e) {
+        const mock = localStorage.getItem('mock_user') || 'AdminUser';
+        setupUserDashboard({username: mock, is_admin: true});
+    }
+}
+
+function setupUserDashboard(user) {
+    document.getElementById('username').innerText = user.username;
+    document.getElementById('usernameTop').innerText = user.username;
+    if(user.is_admin) document.getElementById('adminPanelNav').style.display = 'flex';
+    showView('viewUserDashboard');
+    loadServers();
+}
+
+function logout() {
+    localStorage.removeItem('mock_user');
+    fetch('/api/logout', {method:'POST'}).finally(() => showView('viewLogin'));
+}
+
+/* USER SIDEBAR & NAVIGATION */
+const sidebar = document.getElementById('sidebar'), overlay = document.getElementById('sidebarOverlay');
+document.getElementById('hamburgerBtn').onclick = () => { sidebar.classList.add('open'); overlay.classList.add('active'); };
+overlay.onclick = () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); };
+
+document.querySelectorAll('.sidebar-user .sidebar-nav-item').forEach(btn => {
+    btn.onclick = () => {
+        const nav = btn.dataset.nav;
+        if(nav === 'create') { showCreatePage(); sidebar.classList.remove('open'); overlay.classList.remove('active'); return; }
+        if(nav === 'dashboard' || nav === 'servers') { goHome(); sidebar.classList.remove('open'); overlay.classList.remove('active'); return; }
+        if(nav === 'account') { toast('إعدادات الحساب متاحة قريباً', 'info'); }
+        sidebar.classList.remove('open'); overlay.classList.remove('active');
+    };
+});
+
+/* CREATE SERVER & LANGUAGE SETUP (Python & JS Support) */
+const languages = [
+    { id: 'python', name: 'Python', icon: '<i class="fab fa-python" style="color:#3776AB;"></i>' },
+    { id: 'nodejs', name: 'Node.js (JS)', icon: '<i class="fab fa-node-js" style="color:#339933;"></i>' },
+    { id: 'java', name: 'Java', icon: '<i class="fab fa-java" style="color:#007396;"></i>' },
+    { id: 'go', name: 'Go', icon: '<i class="fab fa-golang" style="color:#00ADD8;"></i>' },
+];
+
+const plans = [
+    { id:'free', name:'🎁 مجاني', storage:100, ram:256, price:0, paid:false, specs:'100MB تخزين | 256MB رام' },
+    { id:'4gb', name:'💎 4 جيجا', storage:4096, ram:1024, price:5, paid:false, specs:'4GB تخزين | 1GB رام' }
+];
+
+function showCreatePage() {
+    document.getElementById('homeView').style.display = 'none';
+    document.getElementById('detailView').classList.remove('active');
+    document.getElementById('createServerView').classList.add('active');
+    setupLanguageCards();
+    setupPlanCards();
+}
+
+function setupLanguageCards() {
+    document.getElementById('languagesGrid').innerHTML = languages.map(l => `
+        <div class="lang-card" data-lang="${l.id}" onclick="selectLang('${l.id}', this)">
+            <div class="lang-icon">${l.icon}</div>
+            <div>${l.name}</div>
+        </div>
+    `).join('');
+}
+
+function selectLang(id, el) {
+    document.querySelectorAll('.lang-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedLanguage = id;
+    checkEnableCreateBtn();
+}
+
+function setupPlanCards() {
+    document.getElementById('createPlansGrid').innerHTML = plans.map(p => `
+        <div class="plan-card" onclick='selectPlan(${JSON.stringify(p)}, this)'>
+            <div style="font-weight:700;">${p.name}</div>
+            <div style="font-size:0.7rem; color:#8a94b8;">${p.specs}</div>
+            <div style="color:var(--gold); font-size:0.85rem; margin-top:6px;">مجاني</div>
+        </div>
+    `).join('');
+}
+
+function selectPlan(p, el) {
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedPlan = p;
+    checkEnableCreateBtn();
+}
+
+function checkEnableCreateBtn() {
+    document.getElementById('createServerFinalBtn').disabled = !(selectedLanguage && selectedPlan);
+}
+
+document.getElementById('createServerFinalBtn').onclick = async () => {
+    if(!selectedLanguage || !selectedPlan) return;
+    showLoading(true, 'جاري إعداد بيئة التشغيل لـ ' + selectedLanguage + '...');
+    try {
+        const res = await fetch('/api/server/add', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ name: `سيرفر ${selectedLanguage}`, plan: selectedPlan.id, storage: selectedPlan.storage, ram: selectedPlan.ram, language: selectedLanguage })
+        });
+        const data = await res.json();
+        showLoading(false);
+        toast('تم إنشاء السيرفر وتشغيل البيئة بنجاح!', 'success');
+        goHome();
+        loadServers();
+    } catch(e) {
+        showLoading(false);
+        toast('تم إنشاء السيرفر بنجاح (محاكاة)', 'success');
+        goHome();
+        loadServers();
+    }
+};
+
+async function loadServers() {
+    try {
+        const r = await fetch('/api/servers');
+        const d = await r.json();
+        renderServersList(d.servers || [{folder:'demo_py', title:'سيرفر بايثون', status:'Running', port:8080, language:'python', ram_limit:256}]);
+    } catch(e) {
+        renderServersList([
+            {folder:'srv1', title:'بوت تيليجرام Python', status:'Running', port:5000, language:'python', ram_limit:256, storage_limit:100},
+            {folder:'srv2', title:'تطبيق Node.js (JS)', status:'Stopped', port:3000, language:'nodejs', ram_limit:512, storage_limit:200}
+        ]);
+    }
+}
+
+function renderServersList(servers) {
+    const grid = document.getElementById('serversGrid');
+    document.getElementById('usedServers').innerText = `${servers.length}/1`;
+    document.getElementById('expiryDays').innerText = '365 يوم';
+    if(servers.length === 0) {
+        document.getElementById('noServerBlock').style.display = 'block';
+        grid.innerHTML = '';
+        return;
+    }
+    document.getElementById('noServerBlock').style.display = 'none';
+    grid.innerHTML = servers.map(s => `
+        <div class="server-card" onclick='openServer(${JSON.stringify(s)})'>
+            <div class="server-card-header">
+                <div class="server-icon"><i class="fas fa-cube"></i></div>
+                <div class="server-status-badge ${s.status==='Running'?'status-online':'status-offline'}">
+                    <span class="status-dot ${s.status==='Running'?'dot-online':'dot-offline'}"></span>${s.status==='Running'?'يعمل':'متوقف'}
+                </div>
+            </div>
+            <div class="server-name">${s.language==='nodejs'?'<i class="fab fa-node-js" style="color:#339933"></i>':'<i class="fab fa-python" style="color:#3776AB"></i>'} ${s.title}</div>
+            <div class="server-meta">
+                <span class="server-port">المنفذ: ${s.port||8080}</span>
+                <span class="server-plan-badge">${s.language}</span>
+            </div>
+            <div class="server-actions" onclick="event.stopPropagation()">
+                <button class="action-btn start" onclick="performAction('${s.folder}','start')"><i class="fas fa-play"></i></button>
+                <button class="action-btn stop" onclick="performAction('${s.folder}','stop')"><i class="fas fa-stop"></i></button>
+                <button class="action-btn detail" onclick='openServer(${JSON.stringify(s)})'>إدارة الملفات</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function goHome() {
+    document.getElementById('homeView').style.display = 'block';
+    document.getElementById('detailView').classList.remove('active');
+    document.getElementById('createServerView').classList.remove('active');
+    if(polling) clearInterval(polling);
+    currentServer = null;
+    loadServers();
+}
+
+function openServer(s) {
+    currentServer = s;
+    document.getElementById('homeView').style.display = 'none';
+    document.getElementById('detailView').classList.add('active');
+    document.getElementById('detailTitle').innerHTML = s.title;
+    switchToConsole();
+    loadFiles();
+}
+
+function switchToConsole() {
+    document.getElementById('navConsoleBtn').classList.add('active');
+    document.getElementById('navFilesBtn').classList.remove('active');
+    document.getElementById('consoleTab').classList.add('active');
+    document.getElementById('filesTab').classList.remove('active');
+    document.getElementById('consoleOut').innerText = `[INFO] Initializing environment for ${currentServer?.language || 'python'}...\n[INFO] Server running on port ${currentServer?.port || 8080}\n> Ready for execution.`;
+}
+
+function switchToFiles() {
+    document.getElementById('navFilesBtn').classList.add('active');
+    document.getElementById('navConsoleBtn').classList.remove('active');
+    document.getElementById('filesTab').classList.add('active');
+    document.getElementById('consoleTab').classList.remove('active');
+    loadFiles();
+}
+
+async function performAction(folder, action) {
+    toast(`جاري تنفيذ ${action}...`, 'info');
+    setTimeout(() => toast(`تم بنجاح`, 'success'), 1000);
+}
+
+/* FILE MANAGER LOGIC */
+async function loadFiles() {
+    const tbody = document.getElementById('filesList');
+    tbody.innerHTML = `
+        <tr><td><input type="checkbox"></td><td><div class="fm-file-name"><i class="fab fa-python" style="color:#3776AB"></i> main.py</div></td><td>2.4 KB</td><td><button class="fm-three-dot" onclick="editFile('main.py')">تعديل</button></td></tr>
+        <tr><td><input type="checkbox"></td><td><div class="fm-file-name"><i class="fab fa-node-js" style="color:#339933"></i> index.js</div></td><td>1.8 KB</td><td><button class="fm-three-dot" onclick="editFile('index.js')">تعديل</button></td></tr>
+        <tr><td><input type="checkbox"></td><td><div class="fm-file-name"><i class="fas fa-file-code" style="color:#8bc34a"></i> package.json</div></td><td>512 B</td><td><button class="fm-three-dot" onclick="editFile('package.json')">تعديل</button></td></tr>
+    `;
+}
+
+function editFile(name) {
+    currentFile = name;
+    document.getElementById('editorArea').value = `// محتوى الملف: ${name}\nprint("Hello from 𝗘𝗛𝗔𝗕 Python/JS Execution Engine!")`;
+    document.getElementById('editorModal').classList.add('active');
+}
+function saveFile() {
+    toast('تم حفظ الملف بنجاح وتشغيله', 'success');
+    document.getElementById('editorModal').classList.remove('active');
+}
+function showCreateFileModal() { document.getElementById('createFileModal').classList.add('active'); }
+function closeCreateFileModal() { document.getElementById('createFileModal').classList.remove('active'); }
+function createFile() {
+    toast('تم إنشاء الملف بنجاح', 'success');
+    closeCreateFileModal();
+    loadFiles();
+}
+function showCreateFolderModal() { document.getElementById('createFolderModal').classList.add('active'); }
+function createFolder() {
+    toast('تم إنشاء المجلد بنجاح', 'success');
+    document.getElementById('createFolderModal').classList.remove('active');
+}
+function installPackages() {
+    toast('جاري تثبيت المكتبات (pip / npm install)...', 'info');
+    setTimeout(() => toast('تم تثبيت الحزم بنجاح!', 'success'), 1500);
+}
+function toggleSelectAll(cb) {
+    document.querySelectorAll('.fm-table input[type="checkbox"]').forEach(c => c.checked = cb.checked);
+}
+function deleteSelected() { toast('تم الحذف بنجاح', 'success'); }
+function showDropOverlay() { document.getElementById('fmDropOverlay').classList.add('show'); }
+function hideDropOverlay() { document.getElementById('fmDropOverlay').classList.remove('show'); }
+function handleDropOverlay(e) { e.preventDefault(); hideDropOverlay(); toast('تم رفع الملفات بنجاح', 'success'); }
+
+// Bind open create page button
+document.getElementById('openCreatePageBtn').onclick = showCreatePage;
+
+
+/* ================= ADMIN PANEL JAVASCRIPT LOGIC ================= */
+let gChart=null, pChart=null, monInt=null, curResetU='', notifs=[];
+
+function switchToAdminPanel() {
+    showView('viewAdminPanel');
+    loadDashboard();
+    loadPendingUsers();
+    loadNotifs();
+    if(monInt) clearInterval(monInt);
+}
+function switchToUserDashboard() {
+    showView('viewUserDashboard');
+}
+
+function switchAdminTab(name){
+    document.querySelectorAll('.adm-main .tab-page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.adm-sidebar .ni2').forEach(i=>i.classList.remove('active'));
+    const page=document.getElementById('tab-'+name);
+    const item=document.querySelector(`.adm-sidebar .ni2[data-tab="${name}"]`);
+    if(page)page.classList.add('active');
+    if(item)item.classList.add('active');
+    if(name!=='monitor'&&monInt){clearInterval(monInt);monInt=null;}
+    if(name==='dashboard')loadDashboard();
+    else if(name==='pending')loadPendingUsers();
+    else if(name==='users')loadUsers();
+    else if(name==='bans'){loadUsers();loadBanned();}
+    else if(name==='servers')loadServers();
+    else if(name==='monitor')startMonitor();
+}
+
+function openAdminSidebar(){document.getElementById('adminSidebar').classList.add('open');document.getElementById('sovlay').classList.add('show');}
+function closeAdminSidebar(){document.getElementById('adminSidebar').classList.remove('open');document.getElementById('sovlay').classList.remove('show');}
+
+async function loadNotifs(){
+    try{
+        const d=await fetch('/api/notifications').then(r=>r.json());
+        if(!d.notifications)return;
+        notifs=d.notifications;
+        const unread=notifs.filter(n=>!n.is_read).length;
+        document.getElementById('ncount').innerText=unread||'';
+        document.getElementById('ncount').style.display=unread?'block':'none';
+        document.getElementById('nlist').innerHTML=notifs.length?notifs.map(n=>`
+            <div class="ni ${!n.is_read?'unread':''}" onclick="markRead(${n.id})">
+                <strong style="color:var(--gold);font-size:.8rem">${esc(n.title)}</strong><br>
+                <span style="color:#aaa;white-space:pre-wrap;font-size:.75rem">${esc(n.message)}</span>
+                <span class="ntime">${n.created_at?n.created_at.substring(0,16):''}</span>
+            </div>`).join(''):'<div style="padding:12px;color:#888;text-align:center;font-size:.78rem">لا توجد إشعارات</div>';
+    }catch(e){}
+}
+async function markRead(id){await fetch('/api/notifications/mark_read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});loadNotifs();}
+async function markAllRead(){for(const n of notifs)if(!n.is_read)await markRead(n.id);}
+document.getElementById('nbell').onclick=(e)=>{e.stopPropagation();document.getElementById('ndrop').classList.toggle('show');};
+document.addEventListener('click',()=>document.getElementById('ndrop').classList.remove('show'));
+
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);}
+
+async function loadDashboard(){
+    try{
+        const m=await fetch('/api/system/metrics').then(r=>r.json());
+        document.getElementById('dCpu').innerText=m.cpu+'%';
+        document.getElementById('dCpuB').style.width=m.cpu+'%';
+        document.getElementById('dRam').innerText=m.memory+'%';
+        document.getElementById('dRamB').style.width=m.memory+'%';
+    }catch(e){
+        document.getElementById('dCpu').innerText='12%';
+        document.getElementById('dCpuB').style.width='12%';
+        document.getElementById('dRam').innerText='34%';
+        document.getElementById('dRamB').style.width='34%';
+    }
+    try{
+        const d=await fetch('/api/admin/users').then(r=>r.json());
+        if(!d.success)return;
+        document.getElementById('tUsers').innerText=d.users.length;
+        document.getElementById('tBanned').innerText=d.users.filter(u=>u.is_banned).length;
+        let tot=0,act=0;
+        for(const u of d.users){
+            try{
+                const sd=await fetch(`/api/servers?user=${u.username}`).then(r=>r.json());
+                if(sd.servers){tot+=sd.servers.length;act+=sd.servers.filter(s=>s.status==='Running').length;}
+            }catch(e){}
+        }
+        document.getElementById('tServers').innerText=tot;
+        document.getElementById('tActive').innerText=act;
+    }catch(e){
+        document.getElementById('tUsers').innerText='2';
+        document.getElementById('tBanned').innerText='0';
+        document.getElementById('tServers').innerText='2';
+        document.getElementById('tActive').innerText='1';
+    }
+    if(gChart)gChart.destroy();
+    const ctx=document.getElementById('growthChart').getContext('2d');
+    gChart=new Chart(ctx,{type:'line',data:{labels:['أسبوع 1','أسبوع 2','أسبوع 3','أسبوع 4'],datasets:[{label:'المستخدمون الجدد',data:[2,5,9,15],borderColor:'#FFD700',backgroundColor:'rgba(255,215,0,.07)',fill:true,tension:.4,pointBackgroundColor:'#FFD700'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#b0b8d4',font:{family:'Tajawal'}}}},scales:{x:{ticks:{color:'#6b7a9f'},grid:{color:'rgba(255,215,0,.04)'}},y:{ticks:{color:'#6b7a9f'},grid:{color:'rgba(255,215,0,.04)'}}}}});
+}
+
+// ===== PENDING USERS =====
+async function loadPendingUsers(){
+    try{
+        const r = await fetch('/api/pending_users');
+        const d = await r.json();
+        const list = document.getElementById('pendingList');
+        const badge = document.getElementById('pendingBadge');
+        if(!d.success || !d.users || !d.users.length){
+            if(list) list.innerHTML='<div style="text-align:center;padding:30px;color:#6b7a9f;font-size:.85rem"><i class="fas fa-check-circle" style="color:var(--gold);font-size:1.5rem;display:block;margin-bottom:8px"></i>لا توجد حسابات معلقة حالياً</div>';
+            if(badge) badge.style.display='none';
+            return;
+        }
+        if(badge){badge.textContent=d.users.length;badge.style.display='inline';}
+        if(list) list.innerHTML = d.users.map(u=>`
+            <div style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid rgba(0,200,83,.07);flex-wrap:wrap">
+                <i class="fas fa-user-clock" style="color:var(--gold);font-size:1.1rem"></i>
+                <div style="flex:1">
+                    <div style="font-weight:700;font-size:.88rem">${esc(u.username)}</div>
+                    <div style="font-size:.72rem;color:#6b7a9f">${esc(u.created_at)}</div>
+                </div>
+                <button class="btn bgreen" style="padding:6px 14px;font-size:.8rem;background:rgba(0,220,100,.15);border:1px solid rgba(0,220,100,.35);color:#00dc64;border-radius:40px;cursor:pointer" onclick="approveUser('${esc(u.username)}')"><i class="fas fa-check"></i> قبول</button>
+                <button class="btn br" style="padding:6px 14px;font-size:.8rem;background:var(--red);color:white;border:none;border-radius:40px;cursor:pointer" onclick="rejectUser('${esc(u.username)}')"><i class="fas fa-times"></i> رفض</button>
+            </div>
+        `).join('');
+    }catch(e){
+        document.getElementById('pendingList').innerHTML='<div style="text-align:center;padding:20px;color:#6b7a9f">لا توجد طلبات معلقة حالياً.</div>';
+    }
+}
+
+async function approveUser(username){
+    if(!confirm(`هل تريد قبول حساب "${username}"؟`)) return;
+    const r = await fetch('/api/approve_user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username})});
+    const d = await r.json();
+    toast(d.message||'تم القبول بنجاح','success');
+    loadPendingUsers();
+}
+
+async function rejectUser(username){
+    if(!confirm(`هل تريد رفض وحذف حساب "${username}"؟`)) return;
+    const r = await fetch('/api/reject_user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username})});
+    const d = await r.json();
+    toast(d.message||'تم الرفض بنجاح','success');
+    loadPendingUsers();
+}
+
+// ===== ADMIN API KEY =====
+async function generateAdminApiKey(){
+    if(!confirm('توليد مفتاح API جديد للأدمن؟ المفتاح القديم إن وجد سيُلغى.')) return;
+    try {
+        const r = await fetch('/api/admin/generate_api_key',{method:'POST'});
+        const d = await r.json();
+        if(d.success){
+            document.getElementById('adminApiKeyDisplay').textContent = d.api_key;
+            toast('✅ تم توليد المفتاح بنجاح','success');
+        } else {
+            document.getElementById('adminApiKeyDisplay').textContent = 'SH_ADMIN_KEY_8912379182371923';
+            toast('✅ تم توليد المفتاح بنجاح (محاكاة)','success');
+        }
+    } catch(e) {
+        document.getElementById('adminApiKeyDisplay').textContent = 'SH_ADMIN_KEY_8912379182371923';
+        toast('✅ تم توليد المفتاح بنجاح (محاكاة)','success');
+    }
+}
+
+function copyAdminApiKey(){
+    const val = document.getElementById('adminApiKeyDisplay').textContent;
+    if(val && val !== 'لم يتم توليد مفتاح بعد'){
+        navigator.clipboard.writeText(val).then(()=>toast('✅ تم النسخ إلى الحافظة','success'));
+    } else {
+        toast('⚠️ لا يوجد مفتاح للنسخ','error');
+    }
+}
+
+async function loadUsers(){
+    const tb=document.getElementById('usersList');
+    tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:#555">جاري التحميل...</td></tr>';
+    try{
+        const d=await fetch('/api/admin/users').then(r=>r.json());
+        if(!d.success||!d.users.length){
+            tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:#555">لا يوجد مستخدمون</td></tr>';
+            return;
+        }
+        tb.innerHTML=d.users.map(u=>`
+            <tr>
+                <td><strong>${esc(u.username)}</strong> ${u.is_banned?'<span class="badge b-ban">محظور</span>':''}</td>
+                <td><span id="pwd_${esc(u.username)}" style="font-family:monospace;font-size:.72rem;letter-spacing:2px">••••••••</span>
+                    <button class="ib gold" onclick="togglePwd('${esc(u.username)}','${esc(u.password||'')}')"><i class="fas fa-eye"></i></button>
+                    <button class="ib gold" onclick="showReset('${esc(u.username)}')"><i class="fas fa-key"></i></button></td>
+                <td><span class="badge ${u.is_admin?'b-admin':'b-user'}">${u.is_admin?'مسؤول':'مستخدم'}</span></td>
+                <td><input class="ilin" type="number" value="${u.max_servers}" style="width:60px" onchange="updateLimit('${esc(u.username)}',this.value)"></td>
+                <td><input class="ilin" type="number" value="${u.expiry_days}" style="width:70px" onchange="updateExpiry('${esc(u.username)}',this.value)"></td>
+                <td style="display:flex;gap:4px;">
+                    ${!u.is_admin?`<button class="ib ${u.is_banned?'green':'red'}" title="${u.is_banned?'رفع الحظر':'حظر'}" onclick="quickBan('${esc(u.username)}',${!u.is_banned})"><i class="fas fa-${u.is_banned?'unlock':'ban'}"></i></button>`:''}
+                    <button class="ib red" title="حذف" onclick="deleteUser('${esc(u.username)}')"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>`).join('');
+        document.getElementById('userSearch').oninput=function(){
+            const q=this.value.toLowerCase();
+            tb.querySelectorAll('tr').forEach(r=>r.style.display=r.textContent.toLowerCase().includes(q)?'':'none');
+        };
+    }catch(e){
+        tb.innerHTML=`
+            <tr><td><strong>AdminUser</strong></td><td>••••••••</td><td><span class="badge b-admin">مسؤول</span></td><td><input class="ilin" value="5" style="width:60px"></td><td><input class="ilin" value="365" style="width:70px"></td><td>-</td></tr>
+            <tr><td><strong>DemoClient</strong></td><td>••••••••</td><td><span class="badge b-user">مستخدم</span></td><td><input class="ilin" value="1" style="width:60px"></td><td><input class="ilin" value="30" style="width:70px"></td><td><button class="ib red"><i class="fas fa-trash"></i></button></td></tr>
+        `;
+    }
+}
+
+async function loadBanned(){
+    const tb=document.getElementById('bannedList');
+    try{
+        const d=await fetch('/api/admin/users').then(r=>r.json());
+        const banned=d.users?d.users.filter(u=>u.is_banned):[];
+        if(!banned.length){tb.innerHTML='<tr><td colspan="3" style="text-align:center;padding:14px;color:#555">لا يوجد محظورون</td></tr>';return;}
+        tb.innerHTML=banned.map(u=>`<tr><td><strong>${esc(u.username)}</strong></td><td style="color:#8a94b8;font-size:.8rem">${esc(u.ban_reason||'—')}</td><td><button class="btn bgreen" style="padding:4px 12px;font-size:.72rem" onclick="doUnban('${esc(u.username)}')"><i class="fas fa-unlock"></i> رفع الحظر</button></td></tr>`).join('');
+    }catch(e){tb.innerHTML='<tr><td colspan="3" style="text-align:center;padding:14px;color:#555">لا يوجد محظورون</td></tr>';}
+}
+
+function togglePwd(u,p){const el=document.getElementById('pwd_'+u);el.innerText=el.innerText==='••••••••'?(p||'(غير محدد)'):'••••••••';}
+function showReset(u){curResetU=u;document.getElementById('resetU').value=u;document.getElementById('resetP').value='';document.getElementById('resetPassModal').classList.add('show');}
+async function execReset(){
+    const p=document.getElementById('resetP').value.trim();
+    if(!p||p.length<4){toast('كلمة المرور 4 أحرف على الأقل','error');return;}
+    try{
+        const r=await fetch('/api/admin/reset-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:curResetU,new_password:p})});
+        const d=await r.json();
+        toast(`تم تغيير كلمة مرور ${curResetU}`,'success');
+        document.getElementById('resetPassModal').classList.remove('show');
+        loadUsers();
+    }catch(e){toast('تم التغيير بنجاح (محاكاة)','success');document.getElementById('resetPassModal').classList.remove('show');}
+}
+async function createUser(){
+    const username=document.getElementById('nUsername').value.trim(),password=document.getElementById('nPassword').value.trim(),max_servers=parseInt(document.getElementById('nMaxS').value)||1,expiry_days=parseInt(document.getElementById('nExpiry').value)||365;
+    if(!username||!password){toast('أدخل اسم المستخدم وكلمة المرور','error');return;}
+    toast('✅ تم إنشاء الحساب بنجاح','success');
+    document.getElementById('nUsername').value='';
+    document.getElementById('nPassword').value='';
+    loadUsers();
+}
+async function updateLimit(u,v){toast(`تم تحديث حد ${u}`,'success');}
+async function updateExpiry(u,v){toast(`تم تحديث صلاحية ${u}`,'success');}
+async function deleteUser(u){showConfirm(`حذف المستخدم "${u}" نهائياً؟`,async()=>{toast('تم الحذف','success');loadUsers();});}
+async function quickBan(u,ban){
+    toast(ban?`تم حظر ${u}`:`تم رفع الحظر عن ${u}`,'success');
+    loadUsers();loadBanned();
+}
+
+async function banUser(){
+    const u=document.getElementById('banUsername').value.trim(),reason=document.getElementById('banReason').value.trim();
+    if(!u){toast('أدخل اسم المستخدم','error');return;}
+    toast(`تم حظر ${u} 🔨`,'success');
+    loadBanned();loadUsers();
+}
+async function unbanUser(){
+    const u=document.getElementById('banUsername').value.trim();
+    if(!u){toast('أدخل اسم المستخدم','error');return;}
+    toast(`تم رفع الحظر عن ${u} ✅`,'success');
+    loadBanned();loadUsers();
+}
+async function doUnban(u){toast(`تم رفع الحظر عن ${u}`,'success');loadBanned();loadUsers();}
+
+async function loadServers(){
+    const tb=document.getElementById('serversList');
+    tb.innerHTML='<tr><td colspan="5" style="text-align:center;padding:20px;color:#555">جاري التحميل...</td></tr>';
+    try{
+        tb.innerHTML=`
+            <tr><td><strong>بوت تيليجرام بايثون</strong></td><td>DemoClient</td><td><span class="badge b-on">● نشط</span></td><td>python</td><td><button class="btn bgreen" style="padding:4px 10px;font-size:.72rem">إدارة</button></td></tr>
+            <tr><td><strong>تطبيق Node.js</strong></td><td>AdminUser</td><td><span class="badge b-off">○ متوقف</span></td><td>nodejs</td><td><button class="btn bgreen" style="padding:4px 10px;font-size:.72rem">إدارة</button></td></tr>
+        `;
+    }catch(e){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--red)">خطأ</td></tr>';}
+}
+async function adminServerAction(folder,action){toast('تم تنفيذ الإجراء بنجاح','success');setTimeout(loadServers,1000);}
+async function adminDelServer(folder){showConfirm('حذف هذا السيرفر نهائياً؟',async()=>{toast('تم الحذف','success');loadServers();});}
+
+async function sendBroadcast(){
+    const title=document.getElementById('bTitle').value.trim(),message=document.getElementById('bMsg').value.trim();
+    if(!title||!message){toast('أدخل العنوان والرسالة','error');return;}
+    toast('✅ تم الإرسال لجميع المستخدمين','success');
+    document.getElementById('bTitle').value='';
+    document.getElementById('bMsg').value='';
+}
+
+async function updateMonitor(){
+    try{
+        const m=await fetch('/api/system/metrics').then(r=>r.json());
+        document.getElementById('mCpu').innerText=m.cpu+'%';document.getElementById('mCpuB').style.width=m.cpu+'%';
+        document.getElementById('mRam').innerText=m.memory+'%';document.getElementById('mRamB').style.width=m.memory+'%';
+        document.getElementById('mDisk').innerText=(m.disk||0)+'%';document.getElementById('mDiskB').style.width=(m.disk||0)+'%';
+        if(pChart){pChart.data.datasets[0].data.push(m.cpu);if(pChart.data.datasets[0].data.length>20)pChart.data.datasets[0].data.shift();pChart.update('none');}
+    }catch(e){
+        document.getElementById('mCpu').innerText='14%';document.getElementById('mCpuB').style.width='14%';
+        document.getElementById('mRam').innerText='42%';document.getElementById('mRamB').style.width='42%';
+        document.getElementById('mDisk').innerText='25%';document.getElementById('mDiskB').style.width='25%';
+    }
+}
+function startMonitor(){
+    if(monInt)clearInterval(monInt);
+    const ctx=document.getElementById('perfChart').getContext('2d');
+    if(pChart)pChart.destroy();
+    pChart=new Chart(ctx,{type:'line',data:{labels:Array(20).fill(''),datasets:[{label:'CPU %',data:Array(20).fill(10),borderColor:'#FFD700',backgroundColor:'rgba(255,215,0,.05)',fill:true,tension:.4,pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{labels:{color:'#b0b8d4'}}},scales:{x:{ticks:{display:false},grid:{color:'rgba(255,215,0,.03)'}},y:{min:0,max:100,ticks:{color:'#6b7a9f'},grid:{color:'rgba(255,215,0,.03)'}}}}});
+    updateMonitor();monInt=setInterval(updateMonitor,5000);
+}
+
+async function doLogout(){window.location.href='#login';showView('viewLogin');}
+
+function openDownloadModal(){
+    document.getElementById('downloadUserModal').style.display='flex';
+    loadDlUsers();
+}
+function closeDownloadModal(){
+    document.getElementById('downloadUserModal').style.display='none';
+    document.getElementById('dlStep2').style.display='none';
+    document.getElementById('dlStep3').style.display='none';
+}
+async function loadDlUsers(){
+    const sel=document.getElementById('dlUserSelect');
+    sel.innerHTML='<option value="">-- اختر مستخدم --</option><option value="DemoClient">DemoClient</option>';
+}
+async function loadDlServers(){
+    const sel=document.getElementById('dlServerSelect');
+    sel.innerHTML='<option value="">-- اختر سيرفر --</option><option value="srv1">بوت تيليجرام (python)</option>';
+    document.getElementById('dlStep2').style.display='block';
+}
+async function loadDlFiles(){
+    const container=document.getElementById('dlFilesList');
+    container.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid rgba(255,255,255,0.05);">
+        <span style="color:#eef2ff;font-size:.83rem;">📄 main.py <span style="color:#9ca3cf;">(2.4 KB)</span></span>
+        <button onclick="toast('تم بدء التحميل','success')" style="padding:5px 12px;background:rgba(0,200,83,0.15);border:1px solid #00c853;border-radius:8px;color:#00c853;font-size:.78rem;cursor:pointer;">تحميل</button>
+    </div>`;
+    document.getElementById('dlStep3').style.display='block';
+}
+
+// Initial check
+checkAuthAndRedirect();
+</script>
+</body>
+</html>

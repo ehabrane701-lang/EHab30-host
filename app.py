@@ -57,10 +57,10 @@ except:
     DOCKER_AVAILABLE = False
 
 def generate_dockerfile(language, server_path):
-    if language == 'python':
+    if language == "python":
         req_path = os.path.join(server_path, "requirements.txt")
         if os.path.exists(req_path):
-            with open(req_path, 'r', errors='ignore') as f:
+            with open(req_path, "r", errors="ignore") as f:
                 _ = f.read().lower()
         return """FROM python:3.11-slim
 WORKDIR /app
@@ -71,7 +71,7 @@ ENV PORT=8080
 EXPOSE 8080
 CMD ["python", "-u", "main.py"]
 """
-    elif language == 'nodejs':
+    elif language == "nodejs":
         return """FROM node:18-slim
 WORKDIR /app
 COPY package*.json ./
@@ -94,7 +94,7 @@ def create_docker_container(folder, language, path, ram_limit=256, cpu_limit=0.5
     if not os.path.exists(dockerfile_path):
         content = generate_dockerfile(language, path)
         if content:
-            with open(dockerfile_path, 'w') as f:
+            with open(dockerfile_path, "w") as f:
                 f.write(content)
     subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
     image_name = ("elmodmen_" + folder + ":latest").lower()[:128]
@@ -230,7 +230,6 @@ class User(Base):
     is_banned = Column(Boolean, default=False)
     ban_ip = Column(String(100), nullable=True)
     ban_reason = Column(String(200), nullable=True)
-    is_pending = Column(Boolean, default=False)
 
 class Server(Base):
     __tablename__ = 'servers'
@@ -269,13 +268,6 @@ class Log(Base):
 try:
     with engine.connect() as conn:
         conn.execute(text("ALTER TABLE servers ADD COLUMN language VARCHAR(20) DEFAULT 'python'"))
-        conn.commit()
-except:
-    pass
-
-try:
-    with engine.connect() as conn:
-        conn.execute(text("ALTER TABLE users ADD COLUMN is_pending BOOLEAN DEFAULT 0"))
         conn.commit()
 except:
     pass
@@ -586,8 +578,7 @@ def api_register():
         is_admin=False,
         max_servers=1,
         expiry_days=365,
-        max_file_size_mb=100,
-        is_pending=True
+        max_file_size_mb=100
     )
     db_session.add(new_user)
     try:
@@ -600,31 +591,7 @@ def api_register():
     os.makedirs(user_dir, exist_ok=True)
     os.makedirs(os.path.join(user_dir, "SERVERS"), exist_ok=True)
     
-    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or 'غير معروف').split(',')[0].strip()
-    
-    # إرسال إشعار فوري لجميع بوتات الأدمن عبر التليجرام
-    for admin_tg_id in ADMIN_IDS:
-        try:
-            keyboard = [[
-                InlineKeyboardButton("✅ موافقة", callback_data=f"reg_approve:{username}"),
-                InlineKeyboardButton("❌ رفض", callback_data=f"reg_reject:{username}")
-            ]]
-            requests.post(
-                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                json={
-                    "chat_id": admin_tg_id,
-                    "text": f"⏳ *طلب تسجيل حساب جديد!*\n\n👤 المستخدم: `{username}`\n🌐 IP: `{client_ip}`\n\nيرجى الاختيار:",
-                    "parse_mode": "Markdown",
-                    "reply_markup": {"inline_keyboard": keyboard}
-                },
-                timeout=5
-            )
-        except Exception as e:
-            print(f"Telegram Admin Notify Error: {e}")
-
-    add_notification(ADMIN_USERNAME, "⏳ طلب حساب جديد", f"طلب تسجيل جديد ينتظر موافقتك\n👤 الاسم: {username}\n🌐 IP: {client_ip}")
-    
-    return jsonify({"success": True, "message": "⏳ تم إرسال طلبك! سيتم مراجعته من قِبل المسؤول وستُعلم بالنتيجة", "pending": True})
+    return jsonify({"success": True, "message": "✅ تم إنشاء الحساب بنجاح! يمكنك تسجيـل الدخول الآن"})
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
@@ -648,8 +615,6 @@ def api_login():
         return jsonify({"success": False, "message": "المستخدم غير موجود"})
     if user.password != hashlib.sha256(password.encode()).hexdigest():
         return jsonify({"success": False, "message": "كلمة المرور غير صحيحة"})
-    if user.is_pending:
-        return jsonify({"success": False, "message": "⏳ حسابك لا يزال قيد المراجعة من قبل المسؤول."})
         
     session.clear()
     session['username'] = username
@@ -691,40 +656,6 @@ def create_api_key():
     user.api_key = new_key
     db_session.commit()
     return jsonify({"success": True, "api_key": new_key})
-
-@app.route('/api/pending_users', methods=['GET'])
-def get_pending_users():
-    if 'username' not in session or session['username'] != ADMIN_USERNAME:
-        return jsonify({"success": False}), 403
-    pending = db_session.query(User).filter_by(is_pending=True).all()
-    return jsonify({"success": True, "users": [{"username": u.username, "created_at": str(u.created_at)} for u in pending]})
-
-@app.route('/api/approve_user', methods=['POST'])
-def approve_user():
-    if 'username' not in session or session['username'] != ADMIN_USERNAME:
-        return jsonify({"success": False}), 403
-    data = request.get_json() or {}
-    username = data.get("username", "").strip()
-    user = db_session.query(User).filter_by(username=username).first()
-    if not user:
-        return jsonify({"success": False, "message": "المستخدم غير موجود"})
-    user.is_pending = False
-    db_session.commit()
-    add_notification(username, "✅ تم قبول حسابك", "مرحباً! تمت الموافقة على حسابك. يمكنك الآن تسجيل الدخول.")
-    return jsonify({"success": True, "message": f"تم قبول {username}"})
-
-@app.route('/api/reject_user', methods=['POST'])
-def reject_user():
-    if 'username' not in session or session['username'] != ADMIN_USERNAME:
-        return jsonify({"success": False}), 403
-    data = request.get_json() or {}
-    username = data.get("username", "").strip()
-    user = db_session.query(User).filter_by(username=username).first()
-    if not user:
-        return jsonify({"success": False, "message": "المستخدم غير موجود"})
-    db_session.delete(user)
-    db_session.commit()
-    return jsonify({"success": True, "message": f"تم رفض وحذف {username}"})
 
 @app.route('/api/admin/generate_api_key', methods=['POST'])
 def admin_generate_api_key():
@@ -1692,28 +1623,6 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
 
-async def handle_registration_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str, target_username: str):
-    query = update.callback_query
-    try:
-        await query.answer()
-    except:
-        pass
-    
-    user = db_session.query(User).filter_by(username=target_username).first()
-    if not user:
-        await query.edit_message_text(f"❌ المستخدم `{target_username}` غير موجود أو تم حذفه مسبقاً.", parse_mode=ParseMode.MARKDOWN)
-        return
-
-    if action == "approve":
-        user.is_pending = False
-        db_session.commit()
-        add_notification(target_username, "✅ تم قبول حسابك", "مرحباً! تمت الموافقة على حسابك من قبل المسؤول. يمكنك الآن تسجيل الدخول.")
-        await query.edit_message_text(query.message.text + f"\n\n✅ *تم الموافقة على حساب المستخدم ({target_username}) بنجاح!*", parse_mode=ParseMode.MARKDOWN)
-    elif action == "reject":
-        db_session.delete(user)
-        db_session.commit()
-        await query.edit_message_text(query.message.text + f"\n\n❌ *تم رفض وحذف حساب المستخدم ({target_username}).*", parse_mode=ParseMode.MARKDOWN)
-
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     join_request = update.chat_join_request
     user, chat = join_request.from_user, join_request.chat
@@ -1867,13 +1776,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     
-    if data.startswith("reg_approve:"):
-        await handle_registration_callback(update, context, "approve", data.replace("reg_approve:", ""))
-        return
-    elif data.startswith("reg_reject:"):
-        await handle_registration_callback(update, context, "reject", data.replace("reg_reject:", ""))
-        return
-    elif data.startswith("jr_accept:"):
+    if data.startswith("jr_accept:"):
         await handle_join_action(update, context, "accept", data.replace("jr_accept:", ""))
         return
     elif data.startswith("jr_decline:"):
@@ -1978,3 +1881,4 @@ if __name__ == "__main__":
     
     # تشغيل تطبيق الويب Flask في الخيط الرئيسي
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+

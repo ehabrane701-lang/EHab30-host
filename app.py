@@ -25,6 +25,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, scoped_session
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatJoinRequest
+from telegram.constants import ParseMode
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
     MessageHandler, filters, ContextTypes, ConversationHandler,
@@ -37,7 +38,7 @@ os.makedirs(USERS_DIR, exist_ok=True)
 
 PORT = int(os.environ.get("PORT", 5000))
 BOT_TOKEN = "9063504218:AAE4Cs43FIamSWLOp-gz49PZ9x5JAgleYD4"
-API_BASE_URL = f"https://EHab30-host-lufu.onrender.com:{PORT}"
+API_BASE_URL = f"https://ehab30-host-2.onrender.com:{PORT}"
 
 # ============== قائمة المسؤولين ==============
 ADMIN_IDS = [
@@ -1599,7 +1600,7 @@ def admin_list_user_files(username, folder):
 # ============== نظام Keep-Alive المتقدم ==============
 class AdvancedKeepAlive:
     def __init__(self):
-        self.site_url = os.environ.get("RENDER_EXTERNAL_URL", f"https://EHab30-host-lufu.onrender.com:{PORT}")
+        self.site_url = os.environ.get("RENDER_EXTERNAL_URL", f"https://ehab30-host-2.onrender.com:{PORT}")
         self.is_running = True
         self.last_ping_time = datetime.now()
         self.ping_interval = 300
@@ -1608,7 +1609,7 @@ class AdvancedKeepAlive:
         
     def format_url(self):
         if not self.site_url:
-            return f"https://EHab30-host-lufu.onrender.com:{PORT}"
+            return f"https://ehab30-host-2.onrender.com:{PORT}"
         if not self.site_url.startswith("http"):
             return f"https://{self.site_url}"
         return self.site_url
@@ -1668,7 +1669,11 @@ def format_user_info(user) -> str:
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     message = query.message if query else update.message
-    if query: await query.answer()
+    if query: 
+        try:
+            await query.answer()
+        except:
+            pass
 
     keyboard = [
         [InlineKeyboardButton("📁 سيرفراتي", callback_data="my_servers")],
@@ -1681,30 +1686,33 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = f"🔹 *القائمة الرئيسية* 🔹\nمرحباً بك في بوت التحكم!"
     if query:
         try:
-            await message.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            await message.edit_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
         except:
-            await message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+            await message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
     else:
-        await message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        await message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def handle_registration_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str, target_username: str):
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except:
+        pass
     
     user = db_session.query(User).filter_by(username=target_username).first()
     if not user:
-        await query.edit_message_text(f"❌ المستخدم `{target_username}` غير موجود أو تم حذفه مسبقاً.", parse_mode="Markdown")
+        await query.edit_message_text(f"❌ المستخدم `{target_username}` غير موجود أو تم حذفه مسبقاً.", parse_mode=ParseMode.MARKDOWN)
         return
 
     if action == "approve":
         user.is_pending = False
         db_session.commit()
         add_notification(target_username, "✅ تم قبول حسابك", "مرحباً! تمت الموافقة على حسابك من قبل المسؤول. يمكنك الآن تسجيل الدخول.")
-        await query.edit_message_text(query.message.text + f"\n\n✅ *تم الموافقة على حساب المستخدم ({target_username}) بنجاح!*", parse_mode="Markdown")
+        await query.edit_message_text(query.message.text + f"\n\n✅ *تم الموافقة على حساب المستخدم ({target_username}) بنجاح!*", parse_mode=ParseMode.MARKDOWN)
     elif action == "reject":
         db_session.delete(user)
         db_session.commit()
-        await query.edit_message_text(query.message.text + f"\n\n❌ *تم رفض وحذف حساب المستخدم ({target_username}).*", parse_mode="Markdown")
+        await query.edit_message_text(query.message.text + f"\n\n❌ *تم رفض وحذف حساب المستخدم ({target_username}).*", parse_mode=ParseMode.MARKDOWN)
 
 async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
     join_request = update.chat_join_request
@@ -1721,7 +1729,7 @@ async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             await context.bot.send_message(
                 chat_id=admin_id,
                 text=f"📨 *طلب انضمام جديد!*\n\n{format_user_info(user)}\n\n📌 الجروب: `{chat.title}`",
-                parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard)
+                parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard)
             )
         except:
             pass
@@ -1734,18 +1742,30 @@ async def handle_join_action(update: Update, context: ContextTypes.DEFAULT_TYPE,
     try:
         if action == "accept":
             await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
-            await query.edit_message_text(query.message.text + "\n\n✅ *تم القبول بنجاح!*", parse_mode="Markdown")
+            await query.edit_message_text(query.message.text + "\n\n✅ *تم القبول بنجاح!*", parse_mode=ParseMode.MARKDOWN)
         else:
             await context.bot.decline_chat_join_request(chat_id=chat_id, user_id=user_id)
-            await query.edit_message_text(query.message.text + "\n\n❌ *تم الرفض.*", parse_mode="Markdown")
+            await query.edit_message_text(query.message.text + "\n\n❌ *تم الرفض.*", parse_mode=ParseMode.MARKDOWN)
         context.bot_data.get("pending_join_requests", {}).pop(req_key, None)
     except Exception as e:
-        await query.answer(f"❌ خطأ: {e}", show_alert=True)
+        try:
+            await query.answer(f"❌ خطأ: {e}", show_alert=True)
+        except:
+            pass
 
 async def show_servers_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-    result = requests.get(f"{API_BASE_URL}/api/bot/servers", params={"api_key": context.user_data.get("api_key", "")}).json()
+    try:
+        await query.answer()
+    except:
+        pass
+    
+    res = requests.get(f"{API_BASE_URL}/api/bot/servers", params={"api_key": context.user_data.get("api_key", "")})
+    try:
+        result = res.json()
+    except:
+        result = {}
+        
     servers = result.get("servers", [])
     if not servers:
         await query.edit_message_text("🚀 لا توجد سيرفرات حالياً.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="main_menu")]]))
@@ -1760,27 +1780,53 @@ async def show_servers_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🗑️ حذف", callback_data=f"action_{srv['folder']}_delete"),
              InlineKeyboardButton("🖥️ كونسول", callback_data=f"console_{srv['folder']}")],
         ]
-        await query.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
     await show_main_menu(update, context)
 
 async def show_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-    metrics = requests.get(f"{API_BASE_URL}/api/system/metrics").json()
+    try:
+        await query.answer()
+    except:
+        pass
+        
+    try:
+        metrics = requests.get(f"{API_BASE_URL}/api/system/metrics", timeout=5).json()
+    except:
+        metrics = {"cpu": 0, "memory": 0}
+        
     text = f"👑 *لوحة الإدارة*\n\n🖥️ CPU: `{metrics.get('cpu')}%` | 💾 RAM: `{metrics.get('memory')}%`"
     keyboard = [
         [InlineKeyboardButton("👥 عرض المستخدمين", callback_data="admin_list_users"),
          InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
     ]
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+    await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def admin_list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
-    result = requests.get(f"{API_BASE_URL}/api/admin/users", cookies={"session": "admin"}).json()
+    try:
+        await query.answer()
+    except:
+        pass
+        
+    try:
+        response = requests.get(f"{API_BASE_URL}/api/admin/users", cookies={"session": "admin"}, timeout=5)
+        result = response.json()
+    except:
+        result = {}
+        
     users = result.get("users", [])
-    text = "👥 *قائمة المستخدمين*\n\n" + "\n".join([f"🟢 `{u['username']}`" for u in users[:15]])
-    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_panel")]]))
+    user_lines = []
+    for u in users[:15]:
+        uname = u.get('username', 'unknown')
+        user_lines.append(f"🟢 `{uname}`")
+        
+    text = "👥 *قائمة المستخدمين*\n\n" + ("\n".join(user_lines) if user_lines else "لا يوجد مستخدمون.")
+    await query.edit_message_text(
+        text, 
+        parse_mode=ParseMode.MARKDOWN, 
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_panel")]])
+    )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📚 المساعدة:\nهذا البوت يعمل بشكل مستمر لإدارة السيرفرات والحسابات عبر المنصة.")
@@ -1790,17 +1836,24 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("api_key"):
-        res = requests.post(f"{API_BASE_URL}/api/bot/verify", json={"api_key": context.user_data["api_key"]}).json()
-        if res.get("success"):
-            await update.message.reply_text(f"✅ مرحباً بعودتك!")
-            await show_main_menu(update, context)
-            return ConversationHandler.END
-    await update.message.reply_text("🤖 *أهلاً بك في بوت الاستضافة!*\n\nأرسل مفتاح API الخاص بك للبدء:", parse_mode="Markdown")
+        try:
+            res = requests.post(f"{API_BASE_URL}/api/bot/verify", json={"api_key": context.user_data["api_key"]}, timeout=5).json()
+            if res.get("success"):
+                await update.message.reply_text(f"✅ مرحباً بعودتك!")
+                await show_main_menu(update, context)
+                return ConversationHandler.END
+        except:
+            pass
+    await update.message.reply_text("🤖 *أهلاً بك في بوت الاستضافة!*\n\nأرسل مفتاح API الخاص بك للبدء:", parse_mode=ParseMode.MARKDOWN)
     return WAITING_FOR_API_KEY
 
 async def handle_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
     api_key = update.message.text.strip()
-    res = requests.post(f"{API_BASE_URL}/api/bot/verify", json={"api_key": api_key}).json()
+    try:
+        res = requests.post(f"{API_BASE_URL}/api/bot/verify", json={"api_key": api_key}, timeout=5).json()
+    except:
+        res = {"success": False}
+        
     if not res.get("success"):
         await update.message.reply_text("❌ مفتاح API غير صالح. حاول مجدداً:")
         return WAITING_FOR_API_KEY
@@ -1830,27 +1883,45 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "main_menu": await show_main_menu(update, context)
     elif data == "my_servers": await show_servers_list(update, context)
     elif data == "create_server":
-        await query.edit_message_text("أرسل اسم السيرفر الجديد:")
+        try:
+            await query.edit_message_text("أرسل اسم السيرفر الجديد:")
+        except:
+            await query.message.reply_text("أرسل اسم السيرفر الجديد:")
         return WAITING_FOR_NEW_SERVER_NAME
     elif data == "logout":
         context.user_data.clear()
-        await query.edit_message_text("🚪 تم تسجيل الخروج. استخدم /start للدخول.")
+        try:
+            await query.edit_message_text("🚪 تم تسجيل الخروج. استخدم /start للدخول.")
+        except:
+            pass
     elif data == "admin_panel": await show_admin_panel(update, context)
     elif data == "admin_list_users": await admin_list_users(update, context)
     elif data.startswith("action_"):
         parts = data.split('_')
         folder, action = '_'.join(parts[1:-1]), parts[-1]
-        requests.post(f"{API_BASE_URL}/api/bot/server/action", json={"api_key": context.user_data.get("api_key"), "folder": folder, "action": action})
+        try:
+            requests.post(f"{API_BASE_URL}/api/bot/server/action", json={"api_key": context.user_data.get("api_key"), "folder": folder, "action": action}, timeout=5)
+        except:
+            pass
         await show_servers_list(update, context)
     elif data.startswith("console_"):
         folder = data.replace("console_", "")
-        res = requests.get(f"{API_BASE_URL}/api/bot/console", params={"api_key": context.user_data.get("api_key"), "folder": folder}).json()
-        await query.edit_message_text(f"📟 *الكونسول*\n```\n{res.get('logs', '')[-3000:]}\n```", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="my_servers")]]))
+        try:
+            res = requests.get(f"{API_BASE_URL}/api/bot/console", params={"api_key": context.user_data.get("api_key"), "folder": folder}, timeout=5).json()
+        except:
+            res = {"logs": "خطأ في جلب الكونسول"}
+        try:
+            await query.edit_message_text(f"📟 *الكونسول*\n```\n{res.get('logs', '')[-3000:]}\n```", parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="my_servers")]]))
+        except:
+            pass
 
 async def receive_server_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
-    requests.post(f"{API_BASE_URL}/api/bot/create_server", json={"api_key": context.user_data.get("api_key"), "name": name})
-    await update.message.reply_text(f"✅ تم إنشاء السيرفر `{name}`", parse_mode="Markdown")
+    try:
+        requests.post(f"{API_BASE_URL}/api/bot/create_server", json={"api_key": context.user_data.get("api_key"), "name": name}, timeout=5)
+    except:
+        pass
+    await update.message.reply_text(f"✅ تم إنشاء السيرفر `{name}`", parse_mode=ParseMode.MARKDOWN)
     await show_main_menu(update, context)
     return ConversationHandler.END
 
@@ -1874,8 +1945,8 @@ def run_telegram_bot():
         app_bot.add_handler(CallbackQueryHandler(button_callback))
         app_bot.add_handler(ChatJoinRequestHandler(handle_join_request))
         app_bot.run_polling(drop_pending_updates=True)
-    except:
-        pass
+    except Exception as e:
+        print(f"Telegram Bot Error: {e}")
 
 
 # ============== تشغيل النظام الشامل ==============
@@ -1907,4 +1978,3 @@ if __name__ == "__main__":
     
     # تشغيل تطبيق الويب Flask في الخيط الرئيسي
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
-

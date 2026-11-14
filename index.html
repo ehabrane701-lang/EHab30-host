@@ -437,7 +437,7 @@ body{
   <button class="btn" id="lBtn" onclick="doLogin()"><i class="fas fa-arrow-right-to-bracket"></i> دخول</button>
 </div>
 
-<!-- فورم التسجيل -->
+<!-- فورم التسجيل الفوري -->
 <div class="form" id="registerForm">
   <div class="msg" id="regMsg"></div>
   <div class="form-group">
@@ -464,7 +464,7 @@ body{
       <button class="eye" onclick="toggleEye('rPassC', this)"><i class="fas fa-eye"></i></button>
     </div>
   </div>
-  <button class="btn" id="rBtn" onclick="doRegister()"><i class="fas fa-user-plus"></i> إنشاء الحساب</button>
+  <button class="btn" id="rBtn" onclick="doRegister()"><i class="fas fa-user-plus"></i> إنشاء الحساب وتسجيل الدخول</button>
 </div>
 
 <div class="footer">
@@ -549,10 +549,6 @@ body{
                 <button class="nav-strip-btn active" id="navConsoleBtn" onclick="switchToConsole()"><i class="fas fa-terminal"></i> الكونسول</button>
                 <button class="nav-strip-btn" id="navFilesBtn" onclick="switchToFiles()"><i class="fas fa-folder-open"></i> الملفات</button>
             </div>
-            <div class="tabs" style="display:none">
-                <button class="tab-btn active" data-tab="console"><i class="fas fa-terminal"></i> الكونسول</button>
-                <button class="tab-btn" data-tab="files"><i class="fas fa-folder-open"></i> الملفات</button>
-            </div>
             <div id="consoleTab" class="tab-content active">
                 <div class="console-ctrl-bar">
                     <button class="detail-action-btn start" id="detailStartBtn" onclick="performAction(currentServer.folder, 'start')"><i class="fas fa-play"></i> تشغيل</button>
@@ -626,7 +622,7 @@ body{
 <!-- ================= 3. VIEW: ADMIN PANEL ================= -->
 <div id="viewAdminPanel" class="app-view">
 <style>
-    .admin-body { font-family:'Tajawal',sans-serif; background:#05090f; color:#eef2ff; }
+    .admin-body { font-family: 'Tajawal', sans-serif; background:#05090f; color:#eef2ff; }
     .bg-a{position:fixed;inset:0;background:radial-gradient(ellipse at 30% 40%,rgba(0,200,83,.06),transparent 60%),radial-gradient(ellipse at 80% 70%,rgba(124,58,237,.05),transparent 50%),linear-gradient(180deg,#05090f,#030712);z-index:-1;pointer-events:none}
     .adm-navbar{position:fixed;top:0;left:0;right:0;height:60px;background:rgba(8,9,20,.97);border-bottom:1px solid var(--gold);display:flex;align-items:center;justify-content:space-between;padding:0 20px;z-index:300}
     .adm-layout{display:flex;margin-top:60px;min-height:calc(100vh - 60px)}
@@ -648,7 +644,7 @@ body{
     .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
     .fg{display:flex;flex-direction:column;gap:5px}
     .fg label{font-size:.73rem;color:#9ca3cf}
-    .fg input,.fg select,.fg textarea{background:rgba(0,0,0,.4);border:1px solid rgba(255,215,0,.25);border-radius:40px;padding:9px 14px;color:white;font-family:'Tajawal',sans-serif;font-size:.85rem;transition:.2s}
+    .fg input,.fg select,.fg textarea{background:rgba(0,0,0,.4);border:1px solid rgba(255,215,0,.25);border-radius:40px;padding:9px 14px;color:white;font-family: 'Tajawal',sans-serif;font-size:.85rem;transition:.2s}
     .fg textarea{border-radius:12px;resize:vertical}
     .tw{overflow-x:auto}
     table{width:100%;border-collapse:collapse}
@@ -664,7 +660,7 @@ body{
     .ib{background:none;border:none;cursor:pointer;font-size:.88rem;padding:4px 6px;border-radius:8px;transition:.15s}
     .ib:hover{background:rgba(255,215,0,.1)}
     .ib.red{color:var(--red)} .ib.gold{color:var(--gold)} .ib.green{color:#00dc64} .ib.orange{color:#FFA500}
-    .sin{background:rgba(0,0,0,.4);border:1px solid rgba(255,215,0,.22);border-radius:40px;padding:7px 16px;color:white;font-family:'Tajawal',sans-serif;width:100%;max-width:280px;margin-bottom:14px;font-size:.83rem}
+    .sin{background:rgba(0,0,0,.4);border:1px solid rgba(255,215,0,.22);border-radius:40px;padding:7px 16px;color:white;font-family: 'Tajawal',sans-serif;width:100%;max-width:280px;margin-bottom:14px;font-size:.83rem}
     .ilin{background:rgba(0,0,0,.4);border:1px solid rgba(255,215,0,.18);border-radius:20px;padding:3px 8px;color:white;font-size:.78rem;text-align:center}
     .mbar{display:none;align-items:center;justify-content:space-between;background:rgba(8,9,20,.7);border:1px solid rgba(255,215,0,.3);border-radius:28px;padding:10px 16px;margin-bottom:20px}
     .hbg{background:rgba(255,215,0,.1);border:none;color:var(--gold);font-size:1.3rem;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer}
@@ -711,12 +707,11 @@ body{
 
 <div class="adm-layout">
 <aside class="adm-sidebar" id="adminSidebar">
-    <div style="padding:18px 18px 14px;border-bottom:1px solid rgba(255,215,0,.07);display:flex;align-items:center;gap:10px;color:var(--gold);font-weight:800;font-size:.95rem"><i class="fas fa-crown" style="font-size:1.2rem"></i> 𝗘𝗛𝗔Б</div>
+    <div style="padding:18px 18px 14px;border-bottom:1px solid rgba(255,215,0,.07);display:flex;align-items:center;gap:10px;color:var(--gold);font-weight:800;font-size:.95rem"><i class="fas fa-crown" style="font-size:1.2rem"></i> 𝗘𝗛𝗔𝗕</div>
     <nav style="padding:10px 8px;flex:1">
         <div style="font-size:.6rem;text-transform:uppercase;color:#3d4a6b;padding:8px 10px 3px;letter-spacing:1.5px">الرئيسية</div>
         <div class="ni2 active" data-tab="dashboard" onclick="switchAdminTab('dashboard')"><i class="fas fa-chart-pie"></i> لوحة التحكم</div>
         <div style="font-size:.6rem;text-transform:uppercase;color:#3d4a6b;padding:8px 10px 3px;letter-spacing:1.5px">إدارة الحسابات</div>
-        <div class="ni2" data-tab="pending" onclick="switchAdminTab('pending')"><i class="fas fa-user-clock"></i> حسابات معلقة <span id="pendingBadge" style="background:var(--red);color:white;border-radius:50%;padding:1px 6px;font-size:.6rem;margin-right:auto;display:none">0</span></div>
         <div class="ni2" data-tab="users" onclick="switchAdminTab('users')"><i class="fas fa-users-gear"></i> المستخدمون</div>
         <div class="ni2" data-tab="bans" onclick="switchAdminTab('bans')"><i class="fas fa-ban"></i> الحظر والتقييد</div>
         <div style="font-size:.6rem;text-transform:uppercase;color:#3d4a6b;padding:8px 10px 3px;letter-spacing:1.5px">إدارة السيرفرات</div>
@@ -735,16 +730,6 @@ body{
         <button class="hbg" id="hbgAdmin" onclick="openAdminSidebar()"><i class="fas fa-bars"></i></button>
         <span style="font-weight:700;color:var(--gold);font-size:.9rem">𝗘𝗛𝗔𝗕</span>
         <span id="adminNameM" style="font-size:.75rem;color:#9ca3cf"></span>
-    </div>
-
-    <!-- PENDING USERS TAB -->
-    <div id="tab-pending" class="tab-page">
-        <div class="ptitle"><i class="fas fa-user-clock"></i> الحسابات المعلقة</div>
-        <div class="card">
-            <div class="ctitle"><i class="fas fa-hourglass-half"></i> طلبات التسجيل الجديدة</div>
-            <p style="font-size:.8rem;color:#6b7a9f;margin-bottom:14px">هذه الحسابات تنتظر موافقتك قبل أن يتمكن أصحابها من تسجيل الدخول.</p>
-            <div id="pendingList"><div style="text-align:center;padding:30px;color:#6b7a9f;font-size:.85rem"><i class="fas fa-spinner fa-spin" style="color:var(--gold);font-size:1.5rem;display:block;margin-bottom:8px"></i>جاري جلب الطلبات...</div></div>
-        </div>
     </div>
 
     <!-- DASHBOARD -->
@@ -1007,18 +992,18 @@ function checkStrength(v){
 async function doLogin(){
     const u=document.getElementById('lUser').value.trim();
     const p=document.getElementById('lPass').value.trim();
-    if(!u||!p){toast('يرجى ملء جميع الحقول', 'error');return;}
+    if(!u||!p){toast('يرجى ملء جميع الحقول','error');return;}
     try{
         const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
         const d=await r.json();
         if(d.success){
-            toast('✅ تم تسجيل الدخول بنجاح!', 'success');
+            toast('✅ تم تسجيل الدخول بنجاح!','success');
             setTimeout(() => checkAuthAndRedirect(), 600);
         }else{
-            toast(d.message||'بيانات غير صحيحة', 'error');
+            toast(d.message||'بيانات غير صحيحة','error');
         }
     }catch(e){
-        toast('✅ تم تسجيل الدخول (محاكاة)', 'success');
+        toast('✅ تم تسجيل الدخول (محاكاة)','success');
         localStorage.setItem('mock_user', u);
         setTimeout(() => checkAuthAndRedirect(), 600);
     }
@@ -1028,18 +1013,21 @@ async function doRegister(){
     const u=document.getElementById('rUser').value.trim();
     const p=document.getElementById('rPass').value.trim();
     const c=document.getElementById('rPassC').value.trim();
-    if(!u||!p){toast('يرجى ملء جميع الحقول', 'error');return;}
-    if(p!==c){toast('كلمتا المرور غير متطابقتين', 'error');return;}
+    if(!u||!p){toast('يرجى ملء جميع الحقول','error');return;}
+    if(p!==c){toast('كلمتا المرور غير متطابقتين','error');return;}
     try{
         const r=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
         const d=await r.json();
         if(d.success){
-            toast('⏳ تم إرسال طلبك للمراجعة!', 'info');
+            toast('✅ تم إنشاء الحساب وتسجيل الدخول بنجاح!','success');
+            setTimeout(() => checkAuthAndRedirect(), 600);
         }else{
-            toast(d.message||'فشل التسجيل', 'error');
+            toast(d.message||'فشل التسجيل','error');
         }
     }catch(e){
-        toast('⏳ تم إرسال طلبك للمراجعة (محاكاة)', 'info');
+        toast('✅ تم إنشاء الحساب وتسجيل الدخول بنجاح (محاكاة)','success');
+        localStorage.setItem('mock_user', u);
+        setTimeout(() => checkAuthAndRedirect(), 600);
     }
 }
 
@@ -1070,7 +1058,7 @@ function setupUserDashboard(user) {
 
 function logout() {
     localStorage.removeItem('mock_user');
-    fetch('/api/logout', {method:'POST'}).finally(() => showView('viewLogin'));
+    fetch('/api/logout', {method: 'POST'}).finally(() => showView('viewLogin'));
 }
 
 /* USER SIDEBAR & NAVIGATION */
@@ -1083,7 +1071,7 @@ document.querySelectorAll('.sidebar-user .sidebar-nav-item').forEach(btn => {
         const nav = btn.dataset.nav;
         if(nav === 'create') { showCreatePage(); sidebar.classList.remove('open'); overlay.classList.remove('active'); return; }
         if(nav === 'dashboard' || nav === 'servers') { goHome(); sidebar.classList.remove('open'); overlay.classList.remove('active'); return; }
-        if(nav === 'account') { toast('إعدادات الحساب متاحة قريباً', 'info'); }
+        if(nav === 'account') { toast('إعدادات الحساب متاحة قريباً','info'); }
         sidebar.classList.remove('open'); overlay.classList.remove('active');
     };
 });
@@ -1097,8 +1085,8 @@ const languages = [
 ];
 
 const plans = [
-    { id:'free', name:'🎁 مجاني', storage:100, ram:256, price:0, paid:false, specs:'100MB تخزين | 256MB رام' },
-    { id:'4gb', name:'💎 4 جيجا', storage:4096, ram:1024, price:5, paid:false, specs:'4GB تخزين | 1GB رام' }
+    { id: 'free', name: '🎁 مجاني', storage:100, ram:256, price:0, paid:false, specs: '100MB تخزين | 256MB رام' },
+    { id: '4gb', name: '💎 4 جيجا', storage:4096, ram:1024, price:5, paid:false, specs: '4GB تخزين | 1GB رام' }
 ];
 
 function showCreatePage() {
@@ -1151,7 +1139,7 @@ document.getElementById('createServerFinalBtn').onclick = async () => {
     showLoading(true, 'جاري إعداد بيئة التشغيل لـ ' + selectedLanguage + '...');
     try {
         const res = await fetch('/api/server/add', {
-            method: 'POST', headers: {'Content-Type':'application/json'},
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name: `سيرفر ${selectedLanguage}`, plan: selectedPlan.id, storage: selectedPlan.storage, ram: selectedPlan.ram, language: selectedLanguage })
         });
         const data = await res.json();
@@ -1171,11 +1159,11 @@ async function loadServers() {
     try {
         const r = await fetch('/api/servers');
         const d = await r.json();
-        renderServersList(d.servers || [{folder:'demo_py', title:'سيرفر بايثون', status:'Running', port:8080, language:'python', ram_limit:256}]);
+        renderServersList(d.servers || [{folder: 'demo_py', title: 'سيرفر بايثون', status: 'Running', port:8080, language: 'python', ram_limit:256}]);
     } catch(e) {
         renderServersList([
-            {folder:'srv1', title:'بوت تيليجرام Python', status:'Running', port:5000, language:'python', ram_limit:256, storage_limit:100},
-            {folder:'srv2', title:'تطبيق Node.js (JS)', status:'Stopped', port:3000, language:'nodejs', ram_limit:512, storage_limit:200}
+            {folder: 'srv1', title: 'بوت تيليجرام Python', status: 'Running', port:5000, language: 'python', ram_limit:256, storage_limit:100},
+            {folder: 'srv2', title: 'تطبيق Node.js (JS)', status: 'Stopped', port:3000, language: 'nodejs', ram_limit:512, storage_limit:200}
         ]);
     }
 }
@@ -1204,8 +1192,8 @@ function renderServersList(servers) {
                 <span class="server-plan-badge">${s.language}</span>
             </div>
             <div class="server-actions" onclick="event.stopPropagation()">
-                <button class="action-btn start" onclick="performAction('${s.folder}','start')"><i class="fas fa-play"></i></button>
-                <button class="action-btn stop" onclick="performAction('${s.folder}','stop')"><i class="fas fa-stop"></i></button>
+                <button class="action-btn start" onclick="performAction('${s.folder}', 'start')"><i class="fas fa-play"></i></button>
+                <button class="action-btn stop" onclick="performAction('${s.folder}', 'stop')"><i class="fas fa-stop"></i></button>
                 <button class="action-btn detail" onclick='openServer(${JSON.stringify(s)})'>إدارة الملفات</button>
             </div>
         </div>
@@ -1304,7 +1292,6 @@ let gChart=null, pChart=null, monInt=null, curResetU='', notifs=[];
 function switchToAdminPanel() {
     showView('viewAdminPanel');
     loadDashboard();
-    loadPendingUsers();
     loadNotifs();
     if(monInt) clearInterval(monInt);
 }
@@ -1321,7 +1308,6 @@ function switchAdminTab(name){
     if(item)item.classList.add('active');
     if(name!=='monitor'&&monInt){clearInterval(monInt);monInt=null;}
     if(name==='dashboard')loadDashboard();
-    else if(name==='pending')loadPendingUsers();
     else if(name==='users')loadUsers();
     else if(name==='bans'){loadUsers();loadBanned();}
     else if(name==='servers')loadServers();
@@ -1392,51 +1378,6 @@ async function loadDashboard(){
     gChart=new Chart(ctx,{type:'line',data:{labels:['أسبوع 1','أسبوع 2','أسبوع 3','أسبوع 4'],datasets:[{label:'المستخدمون الجدد',data:[2,5,9,15],borderColor:'#FFD700',backgroundColor:'rgba(255,215,0,.07)',fill:true,tension:.4,pointBackgroundColor:'#FFD700'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#b0b8d4',font:{family:'Tajawal'}}}},scales:{x:{ticks:{color:'#6b7a9f'},grid:{color:'rgba(255,215,0,.04)'}},y:{ticks:{color:'#6b7a9f'},grid:{color:'rgba(255,215,0,.04)'}}}}});
 }
 
-// ===== PENDING USERS =====
-async function loadPendingUsers(){
-    try{
-        const r = await fetch('/api/pending_users');
-        const d = await r.json();
-        const list = document.getElementById('pendingList');
-        const badge = document.getElementById('pendingBadge');
-        if(!d.success || !d.users || !d.users.length){
-            if(list) list.innerHTML='<div style="text-align:center;padding:30px;color:#6b7a9f;font-size:.85rem"><i class="fas fa-check-circle" style="color:var(--gold);font-size:1.5rem;display:block;margin-bottom:8px"></i>لا توجد حسابات معلقة حالياً</div>';
-            if(badge) badge.style.display='none';
-            return;
-        }
-        if(badge){badge.textContent=d.users.length;badge.style.display='inline';}
-        if(list) list.innerHTML = d.users.map(u=>`
-            <div style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid rgba(0,200,83,.07);flex-wrap:wrap">
-                <i class="fas fa-user-clock" style="color:var(--gold);font-size:1.1rem"></i>
-                <div style="flex:1">
-                    <div style="font-weight:700;font-size:.88rem">${esc(u.username)}</div>
-                    <div style="font-size:.72rem;color:#6b7a9f">${esc(u.created_at)}</div>
-                </div>
-                <button class="btn bgreen" style="padding:6px 14px;font-size:.8rem;background:rgba(0,220,100,.15);border:1px solid rgba(0,220,100,.35);color:#00dc64;border-radius:40px;cursor:pointer" onclick="approveUser('${esc(u.username)}')"><i class="fas fa-check"></i> قبول</button>
-                <button class="btn br" style="padding:6px 14px;font-size:.8rem;background:var(--red);color:white;border:none;border-radius:40px;cursor:pointer" onclick="rejectUser('${esc(u.username)}')"><i class="fas fa-times"></i> رفض</button>
-            </div>
-        `).join('');
-    }catch(e){
-        document.getElementById('pendingList').innerHTML='<div style="text-align:center;padding:20px;color:#6b7a9f">لا توجد طلبات معلقة حالياً.</div>';
-    }
-}
-
-async function approveUser(username){
-    if(!confirm(`هل تريد قبول حساب "${username}"؟`)) return;
-    const r = await fetch('/api/approve_user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username})});
-    const d = await r.json();
-    toast(d.message||'تم القبول بنجاح','success');
-    loadPendingUsers();
-}
-
-async function rejectUser(username){
-    if(!confirm(`هل تريد رفض وحذف حساب "${username}"؟`)) return;
-    const r = await fetch('/api/reject_user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username})});
-    const d = await r.json();
-    toast(d.message||'تم الرفض بنجاح','success');
-    loadPendingUsers();
-}
-
 // ===== ADMIN API KEY =====
 async function generateAdminApiKey(){
     if(!confirm('توليد مفتاح API جديد للأدمن؟ المفتاح القديم إن وجد سيُلغى.')) return;
@@ -1445,23 +1386,23 @@ async function generateAdminApiKey(){
         const d = await r.json();
         if(d.success){
             document.getElementById('adminApiKeyDisplay').textContent = d.api_key;
-            toast('✅ تم توليد المفتاح بنجاح','success');
+            toast('✅ تم توليد المفتاح بنجاح', 'success');
         } else {
             document.getElementById('adminApiKeyDisplay').textContent = 'SH_ADMIN_KEY_8912379182371923';
-            toast('✅ تم توليد المفتاح بنجاح (محاكاة)','success');
+            toast('✅ تم توليد المفتاح بنجاح (محاكاة)', 'success');
         }
     } catch(e) {
         document.getElementById('adminApiKeyDisplay').textContent = 'SH_ADMIN_KEY_8912379182371923';
-        toast('✅ تم توليد المفتاح بنجاح (محاكاة)','success');
+        toast('✅ تم توليد المفتاح بنجاح (محاكاة)', 'success');
     }
 }
 
 function copyAdminApiKey(){
     const val = document.getElementById('adminApiKeyDisplay').textContent;
     if(val && val !== 'لم يتم توليد مفتاح بعد'){
-        navigator.clipboard.writeText(val).then(()=>toast('✅ تم النسخ إلى الحافظة','success'));
+        navigator.clipboard.writeText(val).then(()=>toast('✅ تم النسخ إلى الحافظة', 'success'));
     } else {
-        toast('⚠️ لا يوجد مفتاح للنسخ','error');
+        toast('⚠️ لا يوجد مفتاح للنسخ', 'error');
     }
 }
 

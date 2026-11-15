@@ -1,1884 +1,1288 @@
 #!/usr/bin/env python3
 """
-🚀 𝗘𝗛𝗔𝗕 &  - النظام الشامل المتكامل (تطبيق الويب + بوت التليجرام + Keep-Alive + Ehab + Termux Runner)
+𝗘𝗛𝗔Б - نظام التحكم الشامل، مشغّل البوتات، ومحرك الذكاء الاصطناعي وتصحيح الملفات
+طُوِّر بواسطة: ꪝ🇾🇪إأبـტּٱإڵيمـטּ🇾🇪ꪝ | @Y_20_20
 """
 
 import os
-import json
 import re
-import subprocess
-import psutil
-import socket
 import sys
-import hashlib
-import secrets
+import uuid
+import ast
+import json
 import time
+import logging
 import threading
+import sqlite3
+import subprocess
 import requests
-import shutil
-import zipfile
-import signal
-from datetime import datetime, timedelta
-from flask import Flask, send_from_directory, request, jsonify, session, redirect, url_for, make_response, send_file
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, Float, Text, BigInteger, text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, scoped_session
-
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatJoinRequest
-from telegram.constants import ParseMode
+from bs4 import BeautifulSoup
+from flask import Flask, session, redirect, send_from_directory, render_template_string, request, jsonify
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, CallbackQueryHandler,
-    MessageHandler, filters, ContextTypes, ConversationHandler,
-    ChatJoinRequestHandler
+    MessageHandler, filters, ContextTypes, ConversationHandler
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-USERS_DIR = os.path.join(BASE_DIR, "USERS")
-os.makedirs(USERS_DIR, exist_ok=True)
+# ========== إعداد تطبيق Flask (لوحة التحكم والويب) ==========
+app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "ehab_super_secure_secret_key_2026")
 
-PORT = int(os.environ.get("PORT", 5000))
-BOT_TOKEN = "9063504218:AAE4Cs43FIamSWLOp-gz49PZ9x5JAgleYD4"
-API_BASE_URL = f"https://ehab30-host-2.onrender.com:{PORT}"
-
-# ============== قائمة المسؤولين ==============
-ADMIN_IDS = [
-    1002670694,
-]
-
-ADMIN_PASSWORD_RAW = "@Y_20_20"
-ADMIN_USERNAME = "admin"
-
-# ============== Ehab Support ==============
-DOCKER_AVAILABLE = False
-try:
-    result_check = subprocess.run(["docker", "info"], capture_output=True, timeout=5)
-    DOCKER_AVAILABLE = result_check.returncode == 0
-except:
-    DOCKER_AVAILABLE = False
-
-def generate_dockerfile(language, server_path):
-    if language == "python":
-        req_path = os.path.join(server_path, "requirements.txt")
-        if os.path.exists(req_path):
-            with open(req_path, "r", errors="ignore") as f:
-                _ = f.read().lower()
-        return """FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt* ./
-RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null || echo "no requirements"
-COPY . .
-ENV PORT=8080
-EXPOSE 8080
-CMD ["python", "-u", "main.py"]
-"""
-    elif language == "nodejs":
-        return """FROM node:18-slim
-WORKDIR /app
-COPY package*.json ./
-RUN npm install 2>/dev/null || echo "no package.json"
-COPY . .
-ENV PORT=8080
-EXPOSE 8080
-CMD ["node", "index.js"]
-"""
-    return None
-
-def get_container_name(folder):
-    return ("elmodmen_" + folder).replace(" ", "_").lower()[:63]
-
-def create_docker_container(folder, language, path, ram_limit=256, cpu_limit=0.5, storage_limit=100):
-    if not DOCKER_AVAILABLE:
-        return False, "Ehab غير متاح على هذا السيرفر"
-    container_name = get_container_name(folder)
-    dockerfile_path = os.path.join(path, "ehabfile")
-    if not os.path.exists(dockerfile_path):
-        content = generate_dockerfile(language, path)
-        if content:
-            with open(dockerfile_path, "w") as f:
-                f.write(content)
-    subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
-    image_name = ("elmodmen_" + folder + ":latest").lower()[:128]
-    build_result = subprocess.run(
-        ["docker", "build", "-t", image_name, "."],
-        cwd=path, capture_output=True, text=True, timeout=300
-    )
-    if build_result.returncode != 0:
-        return False, "فشل البناء:\n" + build_result.stderr[-500:]
-    run_cmd = [
-        "docker", "run", "-d",
-        "--name", container_name,
-        "--memory", str(ram_limit) + "m",
-        "--cpus", str(cpu_limit),
-        "--network", "none",
-        "--security-opt", "no-new-privileges",
-        "--tmpfs", "/tmp:size=50m",
-        "-v", path + ":/app",
-        image_name
-    ]
-    run_result = subprocess.run(run_cmd, capture_output=True, text=True, timeout=30)
-    if run_result.returncode != 0:
-        return False, "فشل التشغيل:\n" + run_result.stderr[-500:]
-    container_id = run_result.stdout.strip()
-    return True, container_id
-
-def stop_docker_container(folder):
-    if not DOCKER_AVAILABLE:
-        return
-    subprocess.run(["docker", "stop", get_container_name(folder)], capture_output=True, timeout=15)
-
-def remove_docker_container(folder):
-    if not DOCKER_AVAILABLE:
-        return
-    cname = get_container_name(folder)
-    iname = ("elmodmen_" + folder + ":latest").lower()[:128]
-    subprocess.run(["docker", "stop", cname], capture_output=True, timeout=15)
-    subprocess.run(["docker", "rm", "-f", cname], capture_output=True, timeout=10)
-    subprocess.run(["docker", "rmi", "-f", iname], capture_output=True, timeout=10)
-
-def get_docker_logs(folder, lines=500):
-    if not DOCKER_AVAILABLE:
-        return None
-    cname = get_container_name(folder)
-    result = subprocess.run(
-        ["docker", "logs", "--tail", str(lines), cname],
-        capture_output=True, text=True, timeout=10
-    )
-    if result.returncode == 0:
-        return (result.stdout + result.stderr)[-10000:]
-    return None
-
-def get_docker_stats(folder):
-    if not DOCKER_AVAILABLE:
-        return None
-    cname = get_container_name(folder)
-    result = subprocess.run(
-        ["docker", "stats", "--no-stream", "--format",
-         '{"cpu":"{{.CPUPerc}}","mem":"{{.MemUsage}}"}',
-         cname],
-        capture_output=True, text=True, timeout=10
-    )
-    if result.returncode == 0 and result.stdout.strip():
-        try:
-            return json.loads(result.stdout.strip())
-        except:
-            pass
-    return None
-
-def is_docker_running(folder):
-    if not DOCKER_AVAILABLE:
-        return False
-    cname = get_container_name(folder)
-    result = subprocess.run(
-        ["docker", "inspect", "--format", "{{.State.Running}}", cname],
-        capture_output=True, text=True, timeout=5
-    )
-    return result.stdout.strip() == "true"
-
-
-app = Flask(__name__, static_folder=BASE_DIR)
-
-# ============== تنظيف جلسة قاعدة البيانات بعد كل طلب ==============
-@app.teardown_appcontext
-def shutdown_session(exception=None):
-    db_session.remove()
-
-# ============== إعدادات الجلسة ==============
-app.secret_key = "ELMODMEN_HOST_STABLE_SECRET_KEY_2026"
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-
-# ============== قاعدة البيانات ==============
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'db.sqlite')}"
-
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=300,
-    pool_size=5,
-    max_overflow=10
-)
-db_session = scoped_session(sessionmaker(
-    bind=engine,
-    autocommit=False,
-    autoflush=False,
-    expire_on_commit=False
-))
-Base = declarative_base()
-
-# ============== تعريف الجداول ==============
-class User(Base):
-    __tablename__ = 'users'
-    username = Column(String(50), primary_key=True)
-    password = Column(String(128), nullable=False)
-    is_admin = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.now)
-    max_servers = Column(Integer, default=1)
-    expiry_days = Column(Integer, default=365)
-    last_login = Column(DateTime, nullable=True)
-    telegram_id = Column(String(50), nullable=True)
-    api_key = Column(String(128), nullable=True)
-    is_unlimited = Column(Boolean, default=False)
-    max_file_size_mb = Column(Integer, default=100)
-    is_vip = Column(Boolean, default=False)
-    is_banned = Column(Boolean, default=False)
-    ban_ip = Column(String(100), nullable=True)
-    ban_reason = Column(String(200), nullable=True)
-
-class Server(Base):
-    __tablename__ = 'servers'
-    folder = Column(String(100), primary_key=True)
-    owner = Column(String(50), nullable=False)
-    name = Column(String(100), nullable=False)
-    path = Column(String(500), nullable=False)
-    type = Column(String(20), default="Python")
-    language = Column(String(20), default="python")
-    status = Column(String(20), default="Stopped")
-    created_at = Column(DateTime, default=datetime.now)
-    startup_file = Column(String(200), default="")
-    pid = Column(Integer, nullable=True)
-    port = Column(Integer, nullable=True)
-    plan = Column(String(20), default="free")
-    storage_limit = Column(Integer, default=100)
-    ram_limit = Column(Integer, default=256)
-    cpu_limit = Column(Float, default=0.5)
-    start_time = Column(Float, nullable=True)
-
-class Notification(Base):
-    __tablename__ = 'notifications'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String(50), nullable=False)
-    title = Column(String(200), nullable=False)
-    message = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.now)
-    is_read = Column(Boolean, default=False)
-
-class Log(Base):
-    __tablename__ = 'logs'
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    message = Column(Text)
-    timestamp = Column(DateTime, default=datetime.now)
-
-try:
-    with engine.connect() as conn:
-        conn.execute(text("ALTER TABLE servers ADD COLUMN language VARCHAR(20) DEFAULT 'python'"))
-        conn.commit()
-except:
-    pass
-
-Base.metadata.create_all(bind=engine)
-
-def create_default_admin():
-    if not db_session.query(User).filter_by(username=ADMIN_USERNAME).first():
-        admin = User(
-            username=ADMIN_USERNAME,
-            password=hashlib.sha256(ADMIN_PASSWORD_RAW.encode()).hexdigest(),
-            is_admin=True,
-            max_servers=999999,
-            expiry_days=3650,
-            is_unlimited=True,
-            max_file_size_mb=500
-        )
-        db_session.add(admin)
-        db_session.commit()
-        print("✅ تم إنشاء المسؤول الافتراضي")
-
-create_default_admin()
-
-# ============== دوال مساعدة ==============
-def get_user(username):
-    return db_session.query(User).filter_by(username=username).first()
-
-def get_server(folder):
-    return db_session.query(Server).filter_by(folder=folder).first()
-
-def get_user_servers(username):
-    return db_session.query(Server).filter_by(owner=username).all()
-
-def save_db():
-    db_session.commit()
-
-def add_notification(username, title, message):
-    notif = Notification(username=username, title=title, message=message)
-    db_session.add(notif)
-    db_session.commit()
-
-def get_user_notifications(username):
-    return db_session.query(Notification).filter(
-        (Notification.username == username) | (Notification.username == 'all')
-    ).order_by(Notification.created_at.desc()).limit(50).all()
-
-def mark_notification_read(notif_id):
-    notif = db_session.query(Notification).filter_by(id=notif_id).first()
-    if notif:
-        notif.is_read = True
-        db_session.commit()
-
-PORT_RANGE_START = 8100
-PORT_RANGE_END = 9100
-
-def get_assigned_port():
-    used = set()
-    for srv in db_session.query(Server).all():
-        if srv.port:
-            used.add(srv.port)
-    for port in range(PORT_RANGE_START, PORT_RANGE_END):
-        if port not in used:
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(0.1)
-                result = s.connect_ex(('127.0.0.1', port))
-                s.close()
-                if result != 0:
-                    return port
-            except:
-                return port
-    return PORT_RANGE_START
-
-# ============== مراقبة العمليات ==============
-def process_monitor():
-    while True:
-        try:
-            for srv in db_session.query(Server).filter_by(status="Running"):
-                if DOCKER_AVAILABLE:
-                    if not is_docker_running(srv.folder):
-                        restart_server(srv.folder)
-                elif srv.pid:
-                    try:
-                        p = psutil.Process(srv.pid)
-                        if not p.is_running() or p.status() == psutil.STATUS_ZOMBIE:
-                            restart_server(srv.folder)
-                    except psutil.NoSuchProcess:
-                        restart_server(srv.folder)
-                    except:
-                        pass
-        except:
-            pass
-        time.sleep(15)
-
-def restart_server(folder):
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv:
-        return
-    if srv.pid:
-        try:
-            p = psutil.Process(srv.pid)
-            if hasattr(os, 'killpg'):
-                try:
-                    os.killpg(os.getpgid(p.pid), signal.SIGTERM)
-                except:
-                    pass
-            for child in p.children(recursive=True):
-                child.kill()
-            p.kill()
-        except:
-            pass
-    srv.status = "Stopped"
-    srv.pid = None
-    db_session.commit()
-    time.sleep(2)
-    start_server_process(folder)
-
-def start_server_docker(folder):
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv:
-        return False
-    log_path = os.path.join(srv.path, "out.log")
-    with open(log_path, "a", encoding='utf-8') as lf:
-        lf.write(f"\n{'='*50}\n🐳 تشغيل Ehab Container\n📁 {srv.name}\n🌐 اللغة: {srv.language}\n💾 RAM: {srv.ram_limit}MB | CPU: {srv.cpu_limit}\n{'='*50}\n\n")
-    
-    success, result = create_docker_container(
-        folder=folder,
-        language=srv.language,
-        path=srv.path,
-        ram_limit=srv.ram_limit,
-        cpu_limit=srv.cpu_limit,
-        storage_limit=srv.storage_limit
-    )
-    
-    with open(log_path, "a", encoding='utf-8') as lf:
-        if success:
-            lf.write(f"✅ Container ID: {result}\n")
-        else:
-            lf.write(f"❌ فشل Ehab: {result}\n")
-    
-    if success:
-        srv.status = "Running"
-        srv.pid = None
-        srv.start_time = time.time()
-        db_session.commit()
-        return True
-    return False
-
-def start_server_process(folder):
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv:
-        return False
-    
-    if DOCKER_AVAILABLE:
-        return start_server_docker(folder)
-    
-    main_file = srv.startup_file
-    if not main_file:
-        lang = srv.language.lower()
-        if lang == 'python':
-            py_files = [f for f in os.listdir(srv.path) if f.endswith('.py') and f not in ['out.log', 'meta.json']]
-            if py_files:
-                main_file = py_files[0]
-        elif lang == 'nodejs':
-            if os.path.exists(os.path.join(srv.path, 'index.js')):
-                main_file = 'index.js'
-            elif os.path.exists(os.path.join(srv.path, 'app.js')):
-                main_file = 'app.js'
-        elif lang == 'java':
-            jar_files = [f for f in os.listdir(srv.path) if f.endswith('.jar')]
-            if jar_files:
-                main_file = jar_files[0]
-        elif lang == 'go':
-            if os.path.exists(os.path.join(srv.path, 'main.go')):
-                main_file = 'main.go'
-        elif lang == 'php':
-            if os.path.exists(os.path.join(srv.path, 'index.php')):
-                main_file = 'index.php'
-        if main_file:
-            srv.startup_file = main_file
-            db_session.commit()
-        else:
-            return False
-    file_path = os.path.join(srv.path, main_file)
-    if not os.path.exists(file_path):
-        return False
-    port = srv.port
-    if not port:
-        port = get_assigned_port()
-        srv.port = port
-        db_session.commit()
-    log_path = os.path.join(srv.path, "out.log")
-    log_file = open(log_path, "a", encoding='utf-8')
-    log_file.write(f"\n{'='*50}\n🚀 بدء التشغيل - {datetime.now()}\n📁 {main_file}\n🔌 المنفذ: {port}\n🌐 اللغة: {srv.language}\n{'='*50}\n\n")
-    log_file.flush()
-    try:
-        env = os.environ.copy()
-        env["PORT"] = str(port)
-        env["SERVER_PORT"] = str(port)
-        lang = srv.language.lower()
-        if lang == 'python':
-            cmd = [sys.executable, "-u", main_file]
-        elif lang == 'nodejs':
-            cmd = ["node", main_file]
-        elif lang == 'java':
-            cmd = ["java", "-jar", main_file]
-        elif lang == 'go':
-            cmd = ["go", "run", main_file]
-        elif lang == 'php':
-            cmd = ["php", "-S", f"0.0.0.0:{port}", "-t", srv.path]
-        else:
-            cmd = [sys.executable, "-u", main_file]
-        proc = subprocess.Popen(
-            cmd,
-            cwd=srv.path,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            env=env,
-            preexec_fn=os.setsid if hasattr(os, 'setsid') else None
-        )
-        srv.status = "Running"
-        srv.pid = proc.pid
-        srv.start_time = time.time()
-        db_session.commit()
-        return True
-    except Exception as e:
-        log_file.write(f"\n❌ خطأ: {str(e)}\n")
-        log_file.close()
-        return False
-
-threading.Thread(target=process_monitor, daemon=True).start()
-
-def get_current_user():
-    if "username" in session:
-        return db_session.query(User).filter_by(username=session["username"]).first()
-    return None
-
-def get_user_servers_dir(username):
-    path = os.path.join(USERS_DIR, username, "SERVERS")
-    os.makedirs(path, exist_ok=True)
-    return path
-
-def is_admin(username):
-    if username == ADMIN_USERNAME:
-        return True
-    u = db_session.query(User).filter_by(username=username).first()
-    return u.is_admin if u else False
-
-def get_public_ip():
-    try:
-        return requests.get('https://api.ipify.org', timeout=3).text
-    except:
-        try:
-            return requests.get('https://icanhazip.com', timeout=3).text.strip()
-        except:
-            return "127.0.0.1"
-
-def generate_api_key():
-    return secrets.token_urlsafe(32)
-
-def get_user_by_api_key(api_key):
-    user = db_session.query(User).filter_by(api_key=api_key).first()
-    if user:
-        return user.username, user
-    return None, None
-
-# ============== الصفحة الأساسية index.html والارتباطات ==============
-@app.route('/')
-def index_page():
-    return send_from_directory(BASE_DIR, 'index.html')
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 @app.route('/dashboard')
-def dashboard_page():
-    if 'username' not in session:
-        return redirect('/')
-    user = get_current_user()
-    if user and user.is_admin:
-        return redirect('/admin')
-    return send_from_directory(BASE_DIR, 'index.html')
-
-@app.route('/admin')
-def admin_page():
-    if 'username' not in session or not is_admin(session['username']):
-        return redirect('/')
-    return send_from_directory(BASE_DIR, 'index.html')
-
-
-# ============== API المصادقة ==============
-@app.route('/api/register', methods=['POST'])
-def api_register():
-    data = request.get_json() or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "").strip()
-    if not username or not password:
-        return jsonify({"success": False, "message": "جميع الحقول مطلوبة"})
-    if len(username) < 3:
-        return jsonify({"success": False, "message": "اسم المستخدم 3 أحرف على الأقل"})
-    if len(password) < 4:
-        return jsonify({"success": False, "message": "كلمة المرور 4 أحرف على الأقل"})
-    if db_session.query(User).filter_by(username=username).first():
-        return jsonify({"success": False, "message": "اسم المستخدم موجود"})
-    if username == ADMIN_USERNAME:
-        return jsonify({"success": False, "message": "لا يمكن استخدام هذا الاسم"})
+def dashboard():
+    """مسار لوحة التحكم مع التحقق من الجلسة وإرسال واجهة الملفات/المحرر"""
+    if 'email' not in session:
+        return redirect('/login')
     
-    new_user = User(
-        username=username,
-        password=hashlib.sha256(password.encode()).hexdigest(),
-        is_admin=False,
-        max_servers=1,
-        expiry_days=365,
-        max_file_size_mb=100
-    )
-    db_session.add(new_user)
-    try:
-        db_session.commit()
-    except:
-        db_session.rollback()
-        return jsonify({"success": False, "message": "خطأ في إنشاء الحساب، حاول مرة أخرى"})
+    index_path = os.path.join(BASE_DIR, 'index.html')
+    if os.path.exists(index_path):
+        return send_from_directory(BASE_DIR, 'index.html')
     
-    user_dir = os.path.join(USERS_DIR, username)
-    os.makedirs(user_dir, exist_ok=True)
-    os.makedirs(os.path.join(user_dir, "SERVERS"), exist_ok=True)
-    
-    return jsonify({"success": True, "message": "✅ تم إنشاء الحساب بنجاح! يمكنك تسجيـل الدخول الآن"})
+    return render_template_string("""
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head><meta charset="UTF-8"><title>DARK CODE - Dashboard</title></head>
+        <body style="background:#090909;color:#fff;font-family:sans-serif;text-align:center;padding-top:50px;">
+            <h2>⚠️ واجهة المحرر (index.html) غير موجودة في المجلد الحالي</h2>
+            <p>يرجى التأكد من رفع ملف واجهة المحرر بجانب ملف السيرفر.</p>
+        </body>
+        </html>
+    """)
 
-@app.route('/api/login', methods=['POST'])
-def api_login():
-    data = request.get_json() or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "").strip()
-    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD_RAW:
-        session.clear()
-        session['username'] = username
-        session.permanent = True
-        return jsonify({"success": True, "redirect": "/admin", "is_admin": True})
-        
-    client_ip = request.headers.get('X-Forwarded-For', request.remote_addr or '').split(',')[0].strip()
-    banned_by_ip = db_session.query(User).filter_by(ban_ip=client_ip, is_banned=True).first() if client_ip else None
-    if banned_by_ip:
-        return jsonify({"success": False, "message": "تم حظر هذا الجهاز من الوصول إلى المنصة"})
-        
-    db_session.expire_all()
-    user = db_session.query(User).filter_by(username=username).first()
-    if not user:
-        return jsonify({"success": False, "message": "المستخدم غير موجود"})
-    if user.password != hashlib.sha256(password.encode()).hexdigest():
-        return jsonify({"success": False, "message": "كلمة المرور غير صحيحة"})
-        
-    session.clear()
-    session['username'] = username
-    session.permanent = True
-    user.last_login = datetime.now()
-    try:
-        db_session.commit()
-    except:
-        db_session.rollback()
-    return jsonify({"success": True, "redirect": "/dashboard", "is_admin": user.is_admin})
+@app.route('/login')
+def login_page():
+    return "صفحة تسجيل الدخول - يرجى تسجيل الدخول عبر البوت أو الموقع."
 
-@app.route('/api/logout', methods=['GET', 'POST'])
-def api_logout():
-    session.clear()
-    response = make_response(jsonify({"success": True}))
-    response.set_cookie('session', '', expires=0)
-    return response
+RUNNING_DIR = os.path.join(BASE_DIR, "active_bots")
+LOGS_DIR = os.path.join(BASE_DIR, "bot_logs")
+DB_DIR = os.path.join(BASE_DIR, "database")
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+STORE_DIR = os.path.join(BASE_DIR, "store_files")
+THUMBS_DIR = os.path.join(ASSETS_DIR, "thumbs")
+MARKET_DIR = os.path.join(BASE_DIR, "market")
+ENV_DIR = os.path.join(BASE_DIR, "bot_environments")
+ENCRYPTED_DIR = os.path.join(BASE_DIR, "encrypted_files")
+DOWNLOAD_DIR = os.path.join(BASE_DIR, "downloads")
+UPLOAD_DIR = os.path.abspath("upload_bots")
+SUSPICIOUS_DIR = os.path.join(BASE_DIR, "suspicious_files")
+BACKUPS_DIR = os.path.join(BASE_DIR, "backups")
 
-@app.route('/api/current_user')
-def api_current_user():
-    if "username" in session:
-        u = db_session.query(User).filter_by(username=session["username"]).first()
-        if u:
-            return jsonify({
-                "success": True,
-                "username": session["username"],
-                "is_admin": u.is_admin or session["username"] == ADMIN_USERNAME,
-                "is_unlimited": u.is_unlimited,
-                "max_file_size_mb": u.max_file_size_mb
-            })
-    return jsonify({"success": False})
+MAX_LOG_SIZE_KB = 512
+_ipinfo = {'t': 0, 'data': None}
+bot_scripts = {}
 
-@app.route('/api/create_api_key', methods=['POST'])
-def create_api_key():
-    if 'username' not in session:
-        return jsonify({"success": False}), 401
-    user = db_session.query(User).filter_by(username=session['username']).first()
-    new_key = generate_api_key()
-    user.api_key = new_key
-    db_session.commit()
-    return jsonify({"success": True, "api_key": new_key})
+for d in [RUNNING_DIR, LOGS_DIR, DB_DIR, ASSETS_DIR, STORE_DIR, THUMBS_DIR, MARKET_DIR, ENV_DIR, ENCRYPTED_DIR, DOWNLOAD_DIR, UPLOAD_DIR, SUSPICIOUS_DIR, BACKUPS_DIR]:
+    if not os.path.exists(d):
+        os.makedirs(d, exist_ok=True)
 
-@app.route('/api/admin/generate_api_key', methods=['POST'])
-def admin_generate_api_key():
-    if 'username' not in session or session['username'] != ADMIN_USERNAME:
-        return jsonify({"success": False}), 403
-    user = db_session.query(User).filter_by(username=ADMIN_USERNAME).first()
-    if not user:
-        return jsonify({"success": False, "message": "المسؤول غير موجود"})
-    new_key = generate_api_key()
-    user.api_key = new_key
-    db_session.commit()
-    return jsonify({"success": True, "api_key": new_key})
+USERS_DB = os.path.join(DB_DIR, "users.json")
+FILES_DB = os.path.join(DB_DIR, "files.json")
+SETTINGS_DB = os.path.join(DB_DIR, "settings.json")
+STORE_DB = os.path.join(DB_DIR, "store.json")
+ADMINS_DB = os.path.join(DB_DIR, "admins.json")
+MARKET_DB = os.path.join(DB_DIR, "market.json")
+SECURITY_DB = os.path.join(DB_DIR, "security.json")
+PURCHASES_DB_PATH = os.path.join(DB_DIR, "purchases.db")
 
-@app.route('/api/link_telegram', methods=['POST'])
-def link_telegram():
-    if 'username' not in session:
-        return jsonify({"success": False}), 401
-    data = request.get_json() or {}
-    tg_id = str(data.get('telegram_id'))
-    user = db_session.query(User).filter_by(username=session['username']).first()
-    user.telegram_id = tg_id
-    db_session.commit()
-    return jsonify({"success": True})
+# ==========================================================
+#  نظام التخزين الموحد والآمن (Persistence & Storage Engine)
+# ==========================================================
+db_lock = threading.Lock()
 
-# ============== API الإشعارات ==============
-@app.route('/api/notifications', methods=['GET'])
-def get_notifications():
-    if 'username' not in session:
-        return jsonify({"success": False}), 401
-    notifs = get_user_notifications(session['username'])
-    return jsonify({
-        "success": True,
-        "notifications": [{
-            "id": n.id, "title": n.title, "message": n.message,
-            "created_at": str(n.created_at), "is_read": n.is_read
-        } for n in notifs]
-    })
-
-@app.route('/api/notifications/mark_read', methods=['POST'])
-def mark_read():
-    if 'username' not in session:
-        return jsonify({"success": False}), 401
-    data = request.get_json() or {}
-    mark_notification_read(data.get('id'))
-    return jsonify({"success": True})
-
-# ============== API المسؤول ==============
-@app.route('/api/admin/upgrade-user', methods=['POST'])
-def admin_upgrade_user():
-    if 'username' not in session or not is_admin(session['username']):
-        return jsonify({"success": False, "message": "غير مصرح"}), 403
-    data = request.get_json() or {}
-    target_username = data.get('username', '').strip()
-    user = db_session.query(User).filter_by(username=target_username).first()
-    if not user:
-        return jsonify({"success": False, "message": "المستخدم غير موجود"})
-    user.is_unlimited = True
-    user.max_servers = 999999
-    user.max_file_size_mb = 500
-    db_session.commit()
-    add_notification(target_username, "⭐ تمت ترقيتك", "لقد تمت ترقيتك إلى صلاحيات غير محدودة!")
-    return jsonify({"success": True, "message": f"تم ترقية {target_username} بنجاح"})
-
-@app.route('/api/admin/broadcast', methods=['POST'])
-def admin_broadcast():
-    if 'username' not in session or not is_admin(session['username']):
-        return jsonify({"success": False, "message": "غير مصرح"}), 403
-    data = request.get_json() or {}
-    title = data.get('title', '').strip()
-    message = data.get('message', '').strip()
-    if not title or not message:
-        return jsonify({"success": False, "message": "العنوان والرسالة مطلوبان"})
-    add_notification('all', f"📢 {title}", message)
-    return jsonify({"success": True, "message": "تم إرسال الإذاعة لجميع المستخدمين"})
-
-@app.route('/api/admin/users')
-def admin_users():
-    if "username" not in session or not is_admin(session["username"]):
-        return jsonify({"success": False}), 403
-    users_list = []
-    for u in db_session.query(User).all():
-        users_list.append({
-            "username": u.username,
-            "is_admin": u.is_admin,
-            "created_at": str(u.created_at) if u.created_at else None,
-            "last_login": str(u.last_login) if u.last_login else None,
-            "max_servers": u.max_servers,
-            "expiry_days": u.expiry_days,
-            "telegram_id": u.telegram_id,
-            "api_key": u.api_key,
-            "is_unlimited": u.is_unlimited,
-            "is_banned": u.is_banned
-        })
-    return jsonify({"success": True, "users": users_list})
-
-@app.route('/api/admin/create-user', methods=['POST'])
-def admin_create_user():
-    if "username" not in session or not is_admin(session["username"]):
-        return jsonify({"success": False}), 403
-    data = request.get_json() or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "").strip()
-    max_servers = int(data.get("max_servers", 1))
-    expiry_days = int(data.get("expiry_days", 365))
-    if not username or not password:
-        return jsonify({"success": False, "message": "جميع الحقول مطلوبة"})
-    if db_session.query(User).filter_by(username=username).first():
-        return jsonify({"success": False, "message": "المستخدم موجود"})
-    new_user = User(
-        username=username,
-        password=hashlib.sha256(password.encode()).hexdigest(),
-        is_admin=False,
-        max_servers=max_servers,
-        expiry_days=expiry_days,
-        max_file_size_mb=100
-    )
-    db_session.add(new_user)
-    db_session.commit()
-    user_dir = os.path.join(USERS_DIR, username)
-    os.makedirs(user_dir, exist_ok=True)
-    os.makedirs(os.path.join(user_dir, "SERVERS"), exist_ok=True)
-    return jsonify({"success": True, "message": "✅ تم إنشاء الحساب"})
-
-@app.route('/api/admin/delete-user', methods=['POST'])
-def admin_delete_user():
-    if "username" not in session or not is_admin(session["username"]):
-        return jsonify({"success": False}), 403
-    data = request.get_json() or {}
-    username = data.get("username", "").strip()
-    if not username or username == ADMIN_USERNAME:
-        return jsonify({"success": False, "message": "لا يمكن حذف هذا المستخدم"})
-    user = db_session.query(User).filter_by(username=username).first()
-    if user:
-        servers = db_session.query(Server).filter_by(owner=username).all()
-        for srv in servers:
-            if srv.pid:
-                try:
-                    p = psutil.Process(srv.pid)
-                    p.terminate()
-                except:
-                    pass
-            if os.path.exists(srv.path):
-                try:
-                    shutil.rmtree(srv.path)
-                except:
-                    pass
-            db_session.delete(srv)
-        user_dir = os.path.join(USERS_DIR, username)
-        if os.path.exists(user_dir):
-            try:
-                shutil.rmtree(user_dir)
-            except:
-                pass
-        db_session.delete(user)
-        db_session.commit()
-        return jsonify({"success": True, "message": f"🗑️ تم حذف {username}"})
-    return jsonify({"success": False, "message": "المستخدم غير موجود"})
-
-# ============== API النظام ==============
-@app.route('/api/system/metrics')
-def get_metrics():
-    return jsonify({
-        "cpu": psutil.cpu_percent(),
-        "memory": psutil.virtual_memory().percent,
-        "disk": psutil.disk_usage('/').percent
-    })
-
-@app.route('/api/ping', methods=['GET', 'POST'])
-def ping():
-    return jsonify({"status": "pong", "timestamp": str(datetime.now())})
-
-# ============== السيرفرات ==============
-@app.route('/api/servers')
-def list_servers():
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    user_servers = []
-    total_disk_used = 0
-    total_disk_limit = 0
-    for srv in db_session.query(Server).filter_by(owner=session["username"]):
-        disk_used = 0
-        if os.path.exists(srv.path):
-            for root, dirs, files in os.walk(srv.path):
-                for f in files:
-                    fp = os.path.join(root, f)
-                    if os.path.exists(fp):
-                        disk_used += os.path.getsize(fp)
-        disk_used_mb = disk_used / (1024 * 1024)
-        storage_limit = srv.storage_limit
-        total_disk_used += disk_used_mb
-        total_disk_limit += storage_limit
-        uptime_str = "0 ثانية"
-        if srv.status == "Running" and srv.start_time:
-            diff = time.time() - srv.start_time
-            days = int(diff // 86400)
-            hours = int((diff % 86400) // 3600)
-            mins = int((diff % 3600) // 60)
-            parts = []
-            if days > 0: parts.append(f"{days} يوم")
-            if hours > 0: parts.append(f"{hours} ساعة")
-            if mins > 0: parts.append(f"{mins} دقيقة")
-            uptime_str = " و ".join(parts) if parts else "أقل من دقيقة"
-        user_servers.append({
-            "folder": srv.folder,
-            "title": srv.name,
-            "subtitle": f"سيرفر {srv.type}",
-            "startup_file": srv.startup_file,
-            "status": srv.status,
-            "uptime": uptime_str,
-            "port": srv.port or "N/A",
-            "plan": srv.plan,
-            "language": srv.language,
-            "storage_limit": storage_limit,
-            "ram_limit": srv.ram_limit,
-            "cpu_limit": srv.cpu_limit,
-            "disk_used": round(disk_used_mb, 2)
-        })
-    user = db_session.query(User).filter_by(username=session["username"]).first()
-    max_srv = user.max_servers if user else 1
-    return jsonify({
-        "success": True,
-        "servers": user_servers,
-        "stats": {
-            "used": len(user_servers),
-            "total": max_srv,
-            "expiry": user.expiry_days if user else 365,
-            "disk_used": round(total_disk_used, 2),
-            "disk_total": total_disk_limit
+def init_storage_files():
+    """تهيئة ملفات التخزين JSON و SQLite وضمان سلامتها"""
+    with db_lock:
+        default_files = {
+            USERS_DB: {"users": {}},
+            FILES_DB: {"files": {}},
+            SETTINGS_DB: {"settings": {"maintenance_mode": False}},
+            STORE_DB: {"items": []},
+            ADMINS_DB: {"admins": [1002670694]},
+            MARKET_DB: {"bots": []},
+            SECURITY_DB: {"blocked_ips": [], "banned_users": []}
         }
-    })
-
-@app.route('/api/server/add', methods=['POST'])
-def add_server():
-    if "username" not in session:
-        return jsonify({"success": False, "message": "غير مصرح"}), 401
-    user = db_session.query(User).filter_by(username=session["username"]).first()
-    if not user:
-        return jsonify({"success": False, "message": "مستخدم غير موجود"})
-    user_srv_count = db_session.query(Server).filter_by(owner=session["username"]).count()
-    if user_srv_count >= user.max_servers:
-        return jsonify({"success": False, "message": "لقد وصلت للحد الأقصى من السيرفرات"})
-    data = request.get_json() or {}
-    name = data.get("name", "My Server").strip()
-    plan_id = data.get("plan", "free")
-    storage_limit = int(data.get("storage", 100))
-    ram_limit = int(data.get("ram", 256))
-    cpu_limit = float(data.get("cpu", 0.5))
-    language = data.get("language", "python").strip().lower()
-    if not name:
-        name = "Server_" + secrets.token_hex(2)
-    folder = f"{session['username']}_{re.sub(r'[^a-zA-Z0-9]', '', name)}_{int(time.time())}"
-    path = os.path.join(get_user_servers_dir(session["username"]), folder)
-    os.makedirs(path, exist_ok=True)
-    assigned_port = get_assigned_port()
-    new_server = Server(
-        folder=folder,
-        owner=session["username"],
-        name=name,
-        path=path,
-        status="Stopped",
-        port=assigned_port,
-        plan=plan_id,
-        storage_limit=storage_limit,
-        ram_limit=ram_limit,
-        cpu_limit=cpu_limit,
-        language=language
-    )
-    db_session.add(new_server)
-    db_session.commit()
-    return jsonify({"success": True, "message": f"✅ تم إنشاء الخادم {name}"})
-
-@app.route('/api/server/action/<folder>/<action>', methods=['POST'])
-def server_action(folder, action):
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify({"success": False, "message": "غير مصرح"})
-    if action == "start":
-        if srv.status == "Running":
-            return jsonify({"success": False, "message": "الخادم يعمل بالفعل"})
-        if start_server_process(folder):
-            return jsonify({"success": True, "message": "✅ تم التشغيل"})
-        else:
-            return jsonify({"success": False, "message": "فشل التشغيل"})
-    elif action == "stop":
-        if srv.pid:
-            try:
-                p = psutil.Process(srv.pid)
-                if hasattr(os, 'killpg'):
-                    try:
-                        os.killpg(os.getpgid(p.pid), signal.SIGTERM)
-                    except:
-                        pass
-                for child in p.children(recursive=True):
-                    child.kill()
-                p.kill()
-            except:
-                pass
-        srv.status = "Stopped"
-        srv.pid = None
-        db_session.commit()
-        return jsonify({"success": True, "message": "🛑 تم الإيقاف"})
-    elif action == "restart":
-        restart_server(folder)
-        return jsonify({"success": True, "message": "✅ تم إعادة التشغيل"})
-    elif action == "delete":
-        remove_docker_container(folder)
-        if srv.pid:
-            try:
-                p = psutil.Process(srv.pid)
-                if hasattr(os, 'killpg'):
-                    try:
-                        os.killpg(os.getpgid(p.pid), signal.SIGTERM)
-                    except:
-                        pass
-                for child in p.children(recursive=True):
-                    child.kill()
-                p.kill()
-            except:
-                pass
-        if os.path.exists(srv.path):
-            try:
-                shutil.rmtree(srv.path)
-            except:
+        for path, default_data in default_files.items():
+            if not os.path.exists(path) or os.path.getsize(path) == 0:
                 try:
-                    subprocess.run(["rm", "-rf", srv.path], timeout=5)
-                except:
-                    pass
-        db_session.delete(srv)
-        db_session.commit()
-        return jsonify({"success": True, "message": "🗑️ تم الحذف"})
-    return jsonify({"success": False})
+                    with open(path, "w", encoding="utf-8") as f:
+                        json.dump(default_data, f, ensure_ascii=False, indent=4)
+                except Exception as e:
+                    logging.error(f"Error initializing storage file {path}: {e}")
 
-@app.route('/api/server/stats/<folder>')
-def get_server_stats(folder):
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify({"success": False})
-    status = srv.status
-    logs = "لا توجد مخرجات بعد"
-    docker_logs = get_docker_logs(srv.folder) if DOCKER_AVAILABLE else None
-    if docker_logs:
-        logs = docker_logs
-    else:
-        log_path = os.path.join(srv.path, "out.log")
-        if os.path.exists(log_path):
-            try:
-                with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    lines = f.read().split('\n')
-                    logs = '\n'.join(lines[-500:])
-            except:
-                pass
-    mem_info = "0 MB"
-    if srv.pid and status == "Running":
         try:
-            p = psutil.Process(srv.pid)
-            mem_mb = p.memory_info().rss / (1024 * 1024)
-            mem_info = f"{mem_mb:.1f} MB"
-        except:
-            pass
-    uptime_str = "0 ثانية"
-    if status == "Running" and srv.start_time:
-        diff = time.time() - srv.start_time
-        days = int(diff // 86400)
-        hours = int((diff % 86400) // 3600)
-        mins = int((diff % 3600) // 60)
-        parts = []
-        if days > 0: parts.append(f"{days} يوم")
-        if hours > 0: parts.append(f"{hours} ساعة")
-        if mins > 0: parts.append(f"{mins} دقيقة")
-        uptime_str = " و ".join(parts) if parts else "أقل من دقيقة"
-    return jsonify({
-        "success": True,
-        "status": status,
-        "logs": logs,
-        "mem": mem_info,
-        "uptime": uptime_str,
-        "port": srv.port or "--",
-        "ip": get_public_ip()
-    })
-
-# ============== API الملفات ==============
-@app.route('/api/files/list/<folder>')
-def list_server_files(folder):
-    if "username" not in session:
-        return jsonify([]), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify([])
-    path = srv.path
-    files = []
-    try:
-        for f in os.listdir(path):
-            if f in ['out.log', 'server.log', 'meta.json']:
-                continue
-            fpath = os.path.join(path, f)
-            stat = os.stat(fpath)
-            size_bytes = stat.st_size
-            if size_bytes < 1024:
-                size_str = f"{size_bytes} B"
-            elif size_bytes < 1024*1024:
-                size_str = f"{size_bytes/1024:.1f} KB"
-            else:
-                size_str = f"{size_bytes/(1024*1024):.1f} MB"
-            files.append({"name": f, "size": size_str, "is_dir": os.path.isdir(fpath), "modified": datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M')})
-    except:
-        pass
-    return jsonify(sorted(files, key=lambda x: (not x['is_dir'], x['name'].lower())))
-
-@app.route('/api/files/content/<folder>/<filename>')
-def get_file_content(folder, filename):
-    if "username" not in session:
-        return jsonify({"content": ""}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify({"content": ""})
-    if '..' in filename:
-        return jsonify({"content": ""})
-    fpath = os.path.join(srv.path, filename)
-    if not os.path.exists(fpath) or os.path.isdir(fpath):
-        return jsonify({"content": ""})
-    try:
-        with open(fpath, 'r', encoding='utf-8', errors='replace') as f:
-            return jsonify({"content": f.read()})
-    except:
-        return jsonify({"content": "[ملف ثنائي]"})
-
-@app.route('/api/files/save/<folder>/<filename>', methods=['POST'])
-def save_file_content(folder, filename):
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify({"success": False})
-    if '..' in filename:
-        return jsonify({"success": False, "message": "اسم غير صالح"})
-    data = request.get_json() or {}
-    content = data.get("content", "")
-    fpath = os.path.join(srv.path, filename)
-    try:
-        with open(fpath, 'w', encoding='utf-8') as f:
-            f.write(content)
-        return jsonify({"success": True, "message": "✅ تم الحفظ"})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
-
-@app.route('/api/files/create/<folder>', methods=['POST'])
-def create_file(folder):
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify({"success": False})
-    data = request.get_json() or {}
-    filename = data.get("filename", "").strip()
-    content = data.get("content", "")
-    if not filename or '..' in filename:
-        return jsonify({"success": False, "message": "اسم غير صالح"})
-    fpath = os.path.join(srv.path, filename)
-    try:
-        with open(fpath, 'w', encoding='utf-8') as f:
-            f.write(content)
-        return jsonify({"success": True, "message": f"✅ تم إنشاء {filename}"})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
-
-@app.route('/api/files/delete/<folder>', methods=['POST'])
-def delete_files(folder):
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify({"success": False})
-    data = request.get_json() or {}
-    names = data.get("names", data.get("name", []))
-    if isinstance(names, str):
-        names = [names]
-    if not names:
-        return jsonify({"success": False, "message": "لم يتم تحديد ملفات"})
-    deleted = 0
-    for name in names:
-        if not name or '..' in name:
-            continue
-        fpath = os.path.join(srv.path, name)
-        try:
-            if os.path.isdir(fpath):
-                shutil.rmtree(fpath)
-            elif os.path.exists(fpath):
-                os.remove(fpath)
-            deleted += 1
-        except:
-            pass
-    if deleted > 0:
-        return jsonify({"success": True, "message": f"🗑️ تم حذف {deleted} ملف"})
-    else:
-        return jsonify({"success": False, "message": "فشل الحذف"})
-
-@app.route('/api/files/upload/<folder>', methods=['POST'])
-def upload_files(folder):
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify({"success": False})
-    user = get_user(session["username"])
-    max_file_size_mb = user.max_file_size_mb if user else 100
-    max_file_size_bytes = max_file_size_mb * 1024 * 1024
-    
-    if not os.path.exists(srv.path):
-        os.makedirs(srv.path, exist_ok=True)
-    files = request.files.getlist('files[]')
-    if not files:
-        return jsonify({"success": False, "message": "لا توجد ملفات"})
-    uploaded = 0
-    for f in files:
-        try:
-            if not f or not f.filename:
-                continue
-            if '..' in f.filename:
-                continue
-            f.seek(0, 2)
-            size = f.tell()
-            f.seek(0)
-            if size > max_file_size_bytes:
-                return jsonify({"success": False, "message": f"الملف {f.filename} أكبر من {max_file_size_mb} MB"})
-            save_path = os.path.join(srv.path, f.filename)
-            f.save(save_path)
-            if f.filename.lower().endswith('.zip'):
-                try:
-                    with zipfile.ZipFile(save_path, 'r') as z:
-                        z.extractall(srv.path)
-                except:
-                    pass
-            uploaded += 1
-        except:
-            pass
-    if uploaded > 0:
-        return jsonify({"success": True, "message": f"✅ تم رفع {uploaded} ملف"})
-    else:
-        return jsonify({"success": False, "message": "فشل الرفع"})
-
-@app.route('/api/files/unzip/<folder>/<filename>', methods=['POST'])
-def unzip_file(folder, filename):
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify({"success": False})
-    if '..' in filename or not filename.lower().endswith('.zip'):
-        return jsonify({"success": False, "message": "ملف غير صالح"})
-    fpath = os.path.join(srv.path, filename)
-    if not os.path.exists(fpath):
-        return jsonify({"success": False, "message": "الملف غير موجود"})
-    try:
-        with zipfile.ZipFile(fpath, 'r') as z:
-            z.extractall(srv.path)
-        return jsonify({"success": True, "message": "✅ تم فك الضغط"})
-    except Exception as e:
-        return jsonify({"success": False, "message": f"❌ فشل: {str(e)}"})
-
-@app.route('/api/server/set-startup/<folder>', methods=['POST'])
-def set_startup_file(folder):
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify({"success": False})
-    data = request.get_json() or {}
-    filename = data.get("filename", "").strip()
-    if not filename or '..' in filename:
-        return jsonify({"success": False, "message": "اسم غير صالح"})
-    file_path = os.path.join(srv.path, filename)
-    if not os.path.exists(file_path):
-        return jsonify({"success": False, "message": "الملف غير موجود"})
-    srv.startup_file = filename
-    db_session.commit()
-    return jsonify({"success": True, "message": f"✅ تم تعيين {filename} كملف التشغيل"})
-
-@app.route('/api/server/install/<folder>', methods=['POST'])
-def install_requirements(folder):
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify({"success": False})
-    req_file = os.path.join(srv.path, "requirements.txt")
-    if os.path.exists(req_file):
-        try:
-            log_path = os.path.join(srv.path, "out.log")
-            with open(log_path, "a", encoding='utf-8') as log_file:
-                log_file.write(f"\n{'='*50}\n📦 بدء تثبيت المكتبات...\n{'='*50}\n")
-            subprocess.Popen(
-                [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
-                cwd=srv.path,
-                stdout=open(log_path, "a", encoding='utf-8'),
-                stderr=subprocess.STDOUT
-            )
-            return jsonify({"success": True, "message": "📦 بدأ تثبيت المكتبات"})
+            conn = sqlite3.connect(PURCHASES_DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS purchases (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT,
+                    item_name TEXT,
+                    price REAL,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.commit()
+            conn.close()
         except Exception as e:
-            return jsonify({"success": False, "message": str(e)})
-    return jsonify({"success": False, "message": "requirements.txt غير موجود"})
+            logging.error(f"Error initializing SQLite purchases DB: {e}")
 
-# ============== API للبوت الخارجي ==============
-@app.route('/api/bot/verify', methods=['POST'])
-def bot_verify():
-    data = request.get_json() or {}
-    api_key = data.get('api_key', '').strip()
-    if not api_key:
-        return jsonify({"success": False, "message": "API Key مطلوب"})
-    username, user = get_user_by_api_key(api_key)
-    if not username:
-        return jsonify({"success": False, "message": "API Key غير صالح"})
-    return jsonify({
-        "success": True,
-        "username": username,
-        "is_admin": user.is_admin,
-        "max_servers": user.max_servers,
-        "expiry_days": user.expiry_days,
-        "is_unlimited": user.is_unlimited
-    })
+init_storage_files()
 
-@app.route('/api/bot/servers', methods=['GET'])
-def bot_list_servers():
-    api_key = request.args.get('api_key')
-    if not api_key:
-        return jsonify({"success": False, "message": "API Key مطلوب"}), 401
-    username, _ = get_user_by_api_key(api_key)
-    if not username:
-        return jsonify({"success": False, "message": "API Key غير صالح"}), 401
-    user_servers = []
-    for srv in db_session.query(Server).filter_by(owner=username):
-        uptime_str = "0 ثانية"
-        if srv.status == "Running" and srv.start_time:
-            diff = time.time() - srv.start_time
-            days = int(diff // 86400)
-            hours = int((diff % 86400) // 3600)
-            mins = int((diff % 3600) // 60)
-            parts = []
-            if days > 0: parts.append(f"{days} يوم")
-            if hours > 0: parts.append(f"{hours} ساعة")
-            if mins > 0: parts.append(f"{mins} دقيقة")
-            uptime_str = " و ".join(parts) if parts else "أقل من دقيقة"
-        user_servers.append({
-            "folder": srv.folder,
-            "title": srv.name,
-            "status": srv.status,
-            "uptime": uptime_str,
-            "port": srv.port or "N/A",
-            "plan": srv.plan,
-            "language": srv.language,
-            "storage_limit": srv.storage_limit,
-            "ram_limit": srv.ram_limit,
-            "cpu_limit": srv.cpu_limit
-        })
-    return jsonify({"success": True, "servers": user_servers})
-
-@app.route('/api/bot/server/action', methods=['POST'])
-def bot_server_action():
-    data = request.get_json() or {}
-    api_key = data.get('api_key')
-    folder = data.get('folder')
-    action = data.get('action')
-    if not api_key or not folder or not action:
-        return jsonify({"success": False, "message": "بيانات ناقصة"}), 400
-    username, _ = get_user_by_api_key(api_key)
-    if not username:
-        return jsonify({"success": False, "message": "API Key غير صالح"}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != username:
-        return jsonify({"success": False, "message": "غير مصرح"}), 403
-    if action == "start":
-        if srv.status == "Running":
-            return jsonify({"success": False, "message": "السيرفر يعمل بالفعل"})
-        if start_server_process(folder):
-            return jsonify({"success": True, "message": "✅ تم التشغيل"})
-        else:
-            return jsonify({"success": False, "message": "فشل التشغيل"})
-    elif action == "stop":
-        if srv.pid:
-            try:
-                p = psutil.Process(srv.pid)
-                if hasattr(os, 'killpg'):
-                    try:
-                        os.killpg(os.getpgid(p.pid), signal.SIGTERM)
-                    except:
-                        pass
-                for child in p.children(recursive=True):
-                    child.kill()
-                p.kill()
-            except:
-                pass
-        srv.status = "Stopped"
-        srv.pid = None
-        db_session.commit()
-        return jsonify({"success": True, "message": "🛑 تم الإيقاف"})
-    elif action == "restart":
-        restart_server(folder)
-        return jsonify({"success": True, "message": "✅ تم إعادة التشغيل"})
-    elif action == "delete":
-        remove_docker_container(folder)
-        if srv.pid:
-            try:
-                p = psutil.Process(srv.pid)
-                if hasattr(os, 'killpg'):
-                    try:
-                        os.killpg(os.getpgid(p.pid), signal.SIGTERM)
-                    except:
-                        pass
-                for child in p.children(recursive=True):
-                    child.kill()
-                p.kill()
-            except:
-                pass
-        if os.path.exists(srv.path):
-            try:
-                shutil.rmtree(srv.path)
-            except:
-                try:
-                    subprocess.run(["rm", "-rf", srv.path], timeout=5)
-                except:
-                    pass
-        db_session.delete(srv)
-        db_session.commit()
-        return jsonify({"success": True, "message": "🗑️ تم الحذف"})
-    else:
-        return jsonify({"success": False, "message": "إجراء غير معروف"})
-
-@app.route('/api/bot/console', methods=['GET'])
-def bot_console():
-    api_key = request.args.get('api_key')
-    folder = request.args.get('folder')
-    if not api_key or not folder:
-        return jsonify({"success": False, "message": "بيانات ناقصة"}), 400
-    username, _ = get_user_by_api_key(api_key)
-    if not username:
-        return jsonify({"success": False, "message": "API Key غير صالح"}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != username:
-        return jsonify({"success": False, "message": "غير مصرح"}), 403
-    log_path = os.path.join(srv.path, "out.log")
-    logs = "لا توجد مخرجات بعد"
-    if os.path.exists(log_path):
+def load_json_db(file_path):
+    """قراءة آمنة لملفات قواعد البيانات مع قفل حماية التزامن"""
+    with db_lock:
+        if not os.path.exists(file_path):
+            return {}
         try:
-            with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
-                lines = f.read().split('\n')
-                logs = '\n'.join(lines[-500:])
-        except:
-            pass
-    return jsonify({"success": True, "logs": logs})
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if not content:
+                    return {}
+                return json.loads(content)
+        except Exception as e:
+            logging.error(f"Error loading JSON DB {file_path}: {e}")
+            return {}
 
-@app.route('/api/bot/create_server', methods=['POST'])
-def bot_create_server():
-    data = request.get_json() or {}
-    api_key = data.get('api_key')
-    name = data.get('name', 'خادمي').strip()
-    plan_id = data.get('plan', 'free')
-    storage_limit = int(data.get('storage', 100))
-    ram_limit = int(data.get('ram', 256))
-    cpu_limit = float(data.get('cpu', 0.5))
-    language = data.get('language', 'python').strip().lower()
-    if not api_key:
-        return jsonify({"success": False, "message": "API Key مطلوب"}), 400
-    username, user = get_user_by_api_key(api_key)
-    if not username:
-        return jsonify({"success": False, "message": "API Key غير صالح"}), 401
-    user_srv_count = db_session.query(Server).filter_by(owner=username).count()
-    if user_srv_count >= user.max_servers:
-        return jsonify({"success": False, "message": f"لقد وصلت للحد الأقصى ({user.max_servers})"})
-    folder = f"{username}_{re.sub(r'[^a-zA-Z0-9]', '', name)}_{int(time.time())}"
-    path = os.path.join(get_user_servers_dir(username), folder)
-    os.makedirs(path, exist_ok=True)
-    assigned_port = get_assigned_port()
-    new_server = Server(
-        folder=folder,
-        owner=username,
-        name=name,
-        path=path,
-        status="Stopped",
-        port=assigned_port,
-        plan=plan_id,
-        storage_limit=storage_limit,
-        ram_limit=ram_limit,
-        cpu_limit=cpu_limit,
-        language=language
-    )
-    db_session.add(new_server)
-    db_session.commit()
-    return jsonify({"success": True, "message": f"✅ تم إنشاء {name}", "folder": folder, "port": assigned_port})
+def save_json_db(file_path, data):
+    """حفظ آمن ومستقر لملفات قواعد البيانات JSON"""
+    with db_lock:
+        try:
+            temp_path = file_path + ".tmp"
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+            os.replace(temp_path, file_path)
+            return True
+        except Exception as e:
+            logging.error(f"Error saving JSON DB {file_path}: {e}")
+            return False
 
-# ============== API Ehab ==============
-@app.route('/api/docker/status')
-def docker_status():
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    return jsonify({"success": True, "available": DOCKER_AVAILABLE})
+cancel_states = {}
+last_bot_messages = {}
+active_processes = {}
+admin_steps = {}
+PENDING = {}
+USER_STEPS = {}
 
-@app.route('/api/docker/container_logs/<folder>')
-def container_logs(folder):
-    if "username" not in session:
-        return jsonify({"success": False}), 401
-    srv = db_session.query(Server).filter_by(folder=folder).first()
-    if not srv or srv.owner != session["username"]:
-        return jsonify({"success": False}), 403
-    logs = get_docker_logs(folder) or "لا توجد logs من Ehab"
-    return jsonify({"success": True, "logs": logs})
+# ========== إعدادات وتكامل محرك الذكاء الاصطناعي Ptero.pro المحدث ==========
+HOME_URL = "https://ptero.pro"
+CHAT_URL = f"{HOME_URL}/wp-json/mlp/v1/chat-stream"
 
-# ============== Admin: تحميل الملفات ==============
-@app.route('/api/admin/download_user_file', methods=['POST'])
-def admin_download_user_file():
-    if "username" not in session or not is_admin(session["username"]):
-        return jsonify({"success": False, "message": "غير مصرح"}), 403
-    data = request.get_json() or {}
-    target_user = data.get("username", "").strip()
-    server_folder = data.get("folder", "").strip()
-    file_path = data.get("file_path", "").strip()
-    
-    if not target_user or not server_folder or not file_path:
-        return jsonify({"success": False, "message": "بيانات ناقصة"})
-    
-    srv = db_session.query(Server).filter_by(folder=server_folder, owner=target_user).first()
-    if not srv:
-        return jsonify({"success": False, "message": "السيرفر غير موجود"})
-    
-    full_path = os.path.join(srv.path, file_path)
-    if ".." in full_path or not full_path.startswith(srv.path):
-        return jsonify({"success": False, "message": "مسار غير صالح"})
-    
-    if not os.path.exists(full_path):
-        return jsonify({"success": False, "message": "الملف غير موجود"})
-    
-    return send_file(full_path, as_attachment=True, download_name=os.path.basename(full_path))
+AI_MODELS = {
+    "1": {"id": "ling-3.0-flash",               "name": "Ling 3.0 Flash"},
+    "2": {"id": "deepseek-v4.1-flash:free",     "name": "DeepSeek v4.1 Flash"},
+    "3": {"id": "minimax-m3.1-flash:runware",   "name": "MiniMax M3.1 Flash"},
+    "4": {"id": "glm-5.3-flash",                "name": "GLM 5.3 Flash"},
+    "5": {"id": "qwen3.7-flash:minirouter",     "name": "Qwen 3.7 Flash"},
+}
 
-@app.route('/api/admin/list_user_servers/<username>')
-def admin_list_user_servers(username):
-    if "username" not in session or not is_admin(session["username"]):
-        return jsonify({"success": False}), 403
-    servers = db_session.query(Server).filter_by(owner=username).all()
-    return jsonify({"success": True, "servers": [
-        {"folder": s.folder, "name": s.name, "status": s.status, "language": s.language}
-        for s in servers
-    ]})
+DEFAULT_MODEL_ID = "ling-3.0-flash"
+FALLBACK_MODELS = [
+    "deepseek-v4.1-flash:free",
+    "minimax-m3.1-flash:runware",
+    "glm-5.3-flash",
+    "qwen3.7-flash:minirouter",
+    "ling-3.0-flash:free",
+]
 
-@app.route('/api/admin/list_user_files/<username>/<folder>')
-def admin_list_user_files(username, folder):
-    if "username" not in session or not is_admin(session["username"]):
-        return jsonify({"success": False}), 403
-    srv = db_session.query(Server).filter_by(folder=folder, owner=username).first()
-    if not srv:
-        return jsonify({"success": False})
-    files = []
+MAX_SOURCE_BYTES = 20 * 1024 * 1024
+MAX_OUTPUT_BYTES = 20 * 1024 * 1024
+
+_USER_AGENT = (
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+)
+
+class RepairServiceError(RuntimeError):
+    """Raised when the selected external AI service cannot process a file."""
+
+def fetch_real_session(retries=2):
+    for attempt in range(retries):
+        session = requests.Session()
+        headers = {
+            "User-Agent": _USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "ar-EG,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+        }
+        try:
+            response = session.get(HOME_URL, headers=headers, timeout=25)
+            if response.status_code != 200:
+                if attempt < retries - 1:
+                    time.sleep(1)
+                    continue
+                return None
+
+            html = response.text
+            nonce = None
+            patterns = [
+                r"var\s+nonce\s*=\s*[\"\']([a-f0-9]{8,64})[\"\']",
+                r"[\"\']nonce[\"\']\s*:\s*[\"\']([a-f0-9]{8,64})[\"\']",
+                r"data-referral-nonce=[\"\']([a-f0-9]{8,64})[\"\']",
+                r"x-wp-nonce[\"\']?\s*[:=]\s*[\"\']([a-f0-9]{8,64})[\"\']",
+                r"wp_nonce[\"\']?\s*[:=]\s*[\"\']([a-f0-9]{8,64})[\"\']",
+                r"mlp_nonce[\"\']?\s*[:=]\s*[\"\']([a-f0-9]{8,64})[\"\']",
+                r"data-nonce=[\"\']([a-f0-9]{8,64})[\"\']",
+            ]
+
+            for pattern in patterns:
+                match = re.search(pattern, html, re.IGNORECASE)
+                if match:
+                    nonce = match.group(1)
+                    break
+
+            if not nonce and BeautifulSoup:
+                soup = BeautifulSoup(html, "html.parser")
+                for script in soup.find_all("script"):
+                    text = script.get_text() or ""
+                    if "nonce" in text:
+                        match = re.search(r"[\"\']([a-f0-9]{10})[\"\']", text)
+                        if match:
+                            nonce = match.group(1)
+                            break
+
+            if not nonce:
+                for script in re.findall(r"<script\b[^>]*>(.*?)</script\s*>", html, re.I | re.S):
+                    if "nonce" in script.lower():
+                        match = re.search(r"""["']([a-f0-9]{10})["']""", script, re.I)
+                        if match:
+                            nonce = match.group(1)
+                            break
+
+            if not nonce:
+                if attempt < retries - 1:
+                    time.sleep(1)
+                    continue
+                return None
+
+            guest_token = None
+            for cookie in session.cookies:
+                if any(k in cookie.name.lower() for k in ["mlp", "guest", "token"]):
+                    guest_token = cookie.value
+                    break
+
+            if not guest_token:
+                match = re.search(r"guest[_-]?token[\"\']?\s*[:=]\s*[\"\']([a-f0-9]+)[\"\']", html, re.IGNORECASE)
+                guest_token = match.group(1) if match else uuid.uuid4().hex
+
+            return {
+                "session": session,
+                "nonce": nonce,
+                "guest_token": guest_token,
+                "conversation_id": str(uuid.uuid4()),
+            }
+        except Exception as ex:
+            logging.warning(f"fetch_real_session error (attempt {attempt + 1}): {ex}")
+            if attempt < retries - 1:
+                time.sleep(1)
+
+    return None
+
+def chat_with_model(model_id, user_message, session_data, model_display_name="AI", stream_print=False):
+    payload = {
+        "message": user_message,
+        "model": model_id,
+        "conversation_id": session_data["conversation_id"],
+        "attachments": [],
+        "history": [],
+        "lang": "ar",
+        "github_repo": "",
+        "mode": "quick"
+    }
+
+    headers = {
+        "User-Agent": _USER_AGENT,
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Type": "application/json",
+        "sec-ch-ua-platform": "\"Android\"",
+        "sec-ch-ua": "\"Chromium\";v=\"120\", \"Google Chrome\";v=\"120\"",
+        "sec-ch-ua-mobile": "?1",
+        "x-wp-nonce": session_data["nonce"],
+        "x-mlp-guest-token": session_data["guest_token"],
+        "x-mlp-guest-username": f"user_{session_data['conversation_id'][:6]}",
+        "origin": HOME_URL,
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
+        "referer": f"{HOME_URL}/",
+        "accept-language": "ar-EG,ar;q=0.9,en-US;q=0.8,en;q=0.7",
+        "priority": "u=1, i",
+    }
+
     try:
-        for f in os.listdir(srv.path):
-            if f in ['out.log', 'meta.json']:
+        response = session_data["session"].post(
+            CHAT_URL, json=payload, headers=headers, stream=True, timeout=(30, 240)
+        )
+
+        if response.status_code != 200:
+            return None, None
+
+        full_reply = ""
+        for line in response.iter_lines():
+            if not line:
                 continue
-            fpath = os.path.join(srv.path, f)
-            stat = os.stat(fpath)
-            size_bytes = stat.st_size
-            if size_bytes < 1024:
-                size_str = f"{size_bytes} B"
-            elif size_bytes < 1024*1024:
-                size_str = f"{size_bytes/1024:.1f} KB"
-            else:
-                size_str = f"{size_bytes/(1024*1024):.1f} MB"
-            files.append({"name": f, "size": size_str, "is_dir": os.path.isdir(fpath), "path": f})
-    except:
-        pass
-    return jsonify({"success": True, "files": files, "server_path": srv.path})
-
-
-# ============== نظام Keep-Alive المتقدم ==============
-class AdvancedKeepAlive:
-    def __init__(self):
-        self.site_url = os.environ.get("RENDER_EXTERNAL_URL", f"https://ehab30-host-2.onrender.com:{PORT}")
-        self.is_running = True
-        self.last_ping_time = datetime.now()
-        self.ping_interval = 300
-        self.max_retries = 3
-        self.retry_delay = 5
-        
-    def format_url(self):
-        if not self.site_url:
-            return f"https://ehab30-host-2.onrender.com:{PORT}"
-        if not self.site_url.startswith("http"):
-            return f"https://{self.site_url}"
-        return self.site_url
-    
-    def ping_server(self):
-        url = self.format_url()
-        if not url:
-            return False
-        try:
-            response = requests.get(
-                f"{url}/api/ping",
-                headers={"User-Agent": "OMAR-BRO-HOST-KEEP-ALIVE/1.0", "X-Keep-Alive": "true"},
-                timeout=15,
-                verify=False
-            )
-            if response.status_code == 200:
-                self.last_ping_time = datetime.now()
-                return True
-            return False
-        except:
-            return False
-    
-    def ping_with_retry(self):
-        for attempt in range(self.max_retries):
-            if self.ping_server():
-                return True
-            if attempt < self.max_retries - 1:
-                time.sleep(self.retry_delay)
-        return False
-    
-    def start(self):
-        while self.is_running:
+            line = line.decode("utf-8", errors="replace")
+            if not line.startswith("data:"):
+                continue
+            data_str = line[5:].strip()
+            if not data_str or data_str == "keepalive":
+                continue
             try:
-                time.sleep(self.ping_interval)
-                self.ping_with_retry()
-            except KeyboardInterrupt:
-                self.is_running = False
-            except:
-                time.sleep(10)
-    
-    def stop(self):
-        self.is_running = False
+                data = json.loads(data_str)
+            except json.JSONDecodeError:
+                continue
 
-def run_keep_alive_daemon():
-    ka = AdvancedKeepAlive()
-    ka.start()
+            if "token" in data and isinstance(data["token"], str):
+                full_reply += data["token"]
+                if stream_print:
+                    print(data["token"], end="", flush=True)
+            elif data.get("done"):
+                if data.get("conversation_id"):
+                    session_data["conversation_id"] = data["conversation_id"]
+                return full_reply, data
 
+        return full_reply, None
 
-# ============== بوت التليجرام الرئيسي والمدمج ==============
-(WAITING_FOR_API_KEY, WAITING_FOR_NEW_SERVER_NAME) = range(2)
+    except requests.exceptions.RequestException as ex:
+        logging.warning(f"chat_with_model request error ({model_id}): {ex}")
+        return None, None
 
-def format_user_info(user) -> str:
-    name = user.full_name or "بدون اسم"
-    username = f"@{user.username}" if user.username else "بدون يوزر"
-    return f"👤 الاسم: {name}\n🔗 اليوزر: {username}\n🆔 الآيدي: `{user.id}`"
+def extract_code_from_ai_response(raw_text):
+    if not raw_text:
+        return ""
+    text = raw_text.strip()
+    blocks = re.findall(r"```(?:[a-zA-Z0-9_\-\.\+]*\n)?(.*?)(?:```|$)", text, flags=re.DOTALL)
+    if blocks:
+        clean_blocks = [b.strip() for b in blocks if b.strip()]
+        if clean_blocks:
+            best_block = max(clean_blocks, key=len)
+            if len(best_block) >= 15:
+                return best_block
+    if text.startswith("```"):
+        text = re.sub(r"^```[^\n]*\n", "", text)
+        text = re.sub(r"\n```$", "", text)
+        return text.strip()
+    return text
 
-async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    message = query.message if query else update.message
-    if query: 
+def repair_source(source, instructions, file_name, model_id=None):
+    source_bytes_len = len(source.encode("utf-8"))
+    if source_bytes_len > MAX_SOURCE_BYTES:
+        raise RepairServiceError(
+            f"الملف أكبر من الحد المسموح لإرساله للخدمة ({int(MAX_SOURCE_BYTES / (1024 * 1024))} ميجابايت)."
+        )
+
+    session_data = fetch_real_session()
+    if not session_data:
+        raise RepairServiceError("تعذّر الاتصال بخدمة الذكاء الاصطناعي (فشل تهيئة الجلسة مع الخادم).")
+
+    extra_rules = ""
+    _stem, ext = os.path.splitext(file_name)
+    ext_lower = ext.lower()
+
+    if ext_lower == ".js":
+        extra_rules = (
+            "\nتوجيهات لملفات JavaScript / Node.js:\n"
+            "- إذا كان الكود يستخدم مكتبة node-telegram-bot-api بالصيغة الشائعة: const TelegramBot = require('node-telegram-bot-api'); new TelegramBot(...); فلا تقم بتغييرها ولا تضع دوال فحص تنهي البرنامج بـ process.exit.\n"
+            "- حافظ على بناء الجمل البرمجية الصحيحة في Node.js وتأكد من إغلاق الأقواس.\n"
+        )
+    elif ext_lower == ".php":
+        extra_rules = (
+            "\nتوجيهات لملفات PHP:\n"
+            "- حافظ على علامة البداية <?php واحرص على كتابة كود PHP سليم برمجياً وإغلاق الأقواس والفواصل المنقوطة.\n"
+        )
+    elif ext_lower == ".py":
+        extra_rules = (
+            "\nتوجيهات لملفات Python:\n"
+            "- تأكد من صحة الصياغة النحوية (Syntax) والمسافات البادئة (Indentation) بدقة.\n"
+            "- لا تغير أسماء الدوال أو المتغيرات الأساسية غير المرتبطة بالطلب.\n"
+        )
+
+    prompt = (
+        "أنت مبرمج محترف متخصص في تصحيح وإصلاح وتعديل ملفات الأكواد البرمجية. "
+        "مهمتك: إصلاح الأخطاء وتنفيذ طلب المستخدم بأعلى دقة وبأقل تغييرات ممكنة.\n"
+        "شروط صارمة:\n"
+        "1. أعد محتوى الملف كاملاً وجاهزاً للتشغيل داخل كتلة كود واحدة فقط: ``` ... ```\n"
+        "2. لا تكتب أي شرح أو مقدمات أو كلام بشري قبل أو بعد الكود نهائياً.\n"
+        "3. حافظ على التوكنات والمتغيرات الأساسية ومنطق البوت الأصلي.\n"
+        "4. لا تضف أي أكواد ضارة أو برمجيات خبيثة.\n\n"
+        f"اسم الملف: {file_name}\n"
+        f"طلب المستخدم: {instructions}\n"
+        f"{extra_rules}\n"
+        "محتوى الملف الحالي:\n"
+        f"```text\n{source}\n```"
+    )
+
+    candidate_models = []
+    if model_id:
+        candidate_models.append(model_id)
+    if DEFAULT_MODEL_ID not in candidate_models:
+        candidate_models.append(DEFAULT_MODEL_ID)
+    for fm in FALLBACK_MODELS:
+        if fm not in candidate_models:
+            candidate_models.append(fm)
+
+    for candidate in candidate_models:
         try:
-            await query.answer()
-        except:
-            pass
+            reply, meta = chat_with_model(candidate, prompt, session_data)
+            if not reply or not reply.strip():
+                session_data = fetch_real_session() or session_data
+                continue
 
-    keyboard = [
-        [InlineKeyboardButton("📁 سيرفراتي", callback_data="my_servers")],
-        [InlineKeyboardButton("➕ إنشاء سيرفر جديد", callback_data="create_server")],
-        [InlineKeyboardButton("🚪 تسجيل الخروج", callback_data="logout")]
-    ]
-    if update.effective_user.id in ADMIN_IDS or context.user_data.get("is_admin", False):
-        keyboard.append([InlineKeyboardButton("👑 لوحة الإدارة", callback_data="admin_panel")])
+            extracted = extract_code_from_ai_response(reply)
+            if not extracted or len(extracted.strip()) < 10:
+                continue
 
-    text = f"🔹 *القائمة الرئيسية* 🔹\nمرحباً بك في بوت التحكم!"
-    if query:
-        try:
-            await message.edit_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
-        except:
-            await message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
-    else:
-        await message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
+            if ext_lower == ".py":
+                try:
+                    ast.parse(extracted, filename=file_name)
+                except SyntaxError as syn_err:
+                    logging.warning(f"النموذج {candidate} أنتج كود Python به خطأ صياغة ({syn_err})؛ تجربة نموذج بديل...")
+                    continue
+            elif ext_lower == ".php":
+                try:
+                    chk = subprocess.run(["php", "-l"], input=extracted.encode("utf-8"), capture_output=True, timeout=5)
+                    if chk.returncode != 0:
+                        logging.warning(f"النموذج {candidate} أنتج كود PHP به خطأ صياغة؛ تجربة نموذج بديل...")
+                        continue
+                except Exception:
+                    pass
 
-async def handle_join_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    join_request = update.chat_join_request
-    user, chat = join_request.from_user, join_request.chat
-    if "pending_join_requests" not in context.bot_data:
-        context.bot_data["pending_join_requests"] = {}
-    req_key = f"{chat.id}:{user.id}"
-    context.bot_data["pending_join_requests"][req_key] = {"user_id": user.id, "chat_id": chat.id}
+            return extracted
 
-    for admin_id in ADMIN_IDS:
-        try:
-            keyboard = [[InlineKeyboardButton("✅ قبول", callback_data=f"jr_accept:{req_key}"),
-                         InlineKeyboardButton("❌ رفض", callback_data=f"jr_decline:{req_key}")]]
-            await context.bot.send_message(
-                chat_id=admin_id,
-                text=f"📨 *طلب انضمام جديد!*\n\n{format_user_info(user)}\n\n📌 الجروب: `{chat.title}`",
-                parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        except:
-            pass
+        except Exception as ex:
+            logging.warning(f"فشل النموذج {candidate}: {ex}")
+            continue
 
-async def handle_join_action(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str, req_key: str):
-    query = update.callback_query
-    parts = req_key.split(":")
-    if len(parts) != 2: return
-    chat_id, user_id = int(parts[0]), int(parts[1])
+    raise RepairServiceError("تعذّر الحصول على نسخة صالحة وخالية من الأخطاء من خدمة الذكاء الاصطناعي بعد تجربة كافة النماذج.")
+
+# ========== إعدادات السجل (Logging) ==========
+logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger("ehab_system")
+
+# ========== إعدادات النظام الأساسية ==========
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "7687262918:AAH8mBdHAALzhwZBh2HCe8DHu-oRqMEePg8")
+API_BASE_URL = os.environ.get("API_BASE_URL", "[https://ehab10-host-1.onrender.com](https://ehab10-host-1.onrender.com)")
+
+ADMIN_TELEGRAM_IDS = [1002670694]
+
+DEVELOPER_INFO = "🛠 طُوِّر بواسطة: *ꪝ🇾🇪إأبـტּٱإڵيمـטּ🇾🇪ꪝ*\n📬 تواصل: @Y_20_20"
+
+# ========== حالات المحادثة للتحكم والذكاء الاصطناعي ==========
+(
+    WAITING_FOR_API_KEY,
+    WAITING_FOR_NEW_SERVER_NAME,
+    WAITING_FOR_SERVER_TYPE,
+    WAITING_FOR_DELETE_USERNAME,
+    WAITING_FOR_AI_PROMPT,
+) = range(5)
+
+
+# ─────────────────────────────────────────────────
+#  وظائف الأمان والحماية والتنقية (Sanitization)
+# ─────────────────────────────────────────────────
+def sanitize_input(text: str, max_length: int = 500) -> str:
+    """تنقية النصوص ومدخلات المستخدمين لمنع هجمات الحقن أو XSS"""
+    if not isinstance(text, str):
+        return ""
+    clean_text = re.sub(r'[^\w\s\-_@\.:/\?\!\،\?\ء-ي]', '', text)
+    return clean_text[:max_length].strip()
+
+
+def api_request(endpoint, method="GET", data=None, params=None, api_key=None):
+    """إرسال طلبات آمنة لخادم التحكم مع معالجة كاملة للأخطاء"""
+    url = f"{API_BASE_URL}{endpoint}"
+    headers = {"User-Agent": "EhabBot-SecureClient/2.0"}
     try:
-        if action == "accept":
-            await context.bot.approve_chat_join_request(chat_id=chat_id, user_id=user_id)
-            await query.edit_message_text(query.message.text + "\n\n✅ *تم القبول بنجاح!*", parse_mode=ParseMode.MARKDOWN)
+        if method == "GET":
+            p = dict(params or {})
+            if api_key:
+                p["api_key"] = sanitize_input(api_key, 256)
+            resp = requests.get(url, params=p, headers=headers, timeout=20)
         else:
-            await context.bot.decline_chat_join_request(chat_id=chat_id, user_id=user_id)
-            await query.edit_message_text(query.message.text + "\n\n❌ *تم الرفض.*", parse_mode=ParseMode.MARKDOWN)
-        context.bot_data.get("pending_join_requests", {}).pop(req_key, None)
+            d = dict(data or {})
+            if api_key and "api_key" not in d:
+                d["api_key"] = sanitize_input(api_key, 256)
+            resp = requests.post(url, json=d, headers=headers, timeout=20)
+            
+        if resp.ok:
+            return resp.json()
+        return {"success": False, "message": f"HTTP Error: {resp.status_code}"}
+    except requests.exceptions.Timeout:
+        logger.error(f"API Timeout on {endpoint}")
+        return {"success": False, "message": "انتهت مهلة الاتصال بالخادم الرئيسي."}
+    except requests.exceptions.RequestException as e:
+        logger.error(f"API Request Exception: {e}")
+        return {"success": False, "message": "فشل الاتصال بخادم النظام الأساسي."}
     except Exception as e:
-        try:
-            await query.answer(f"❌ خطأ: {e}", show_alert=True)
-        except:
-            pass
+        logger.error(f"Unexpected error in api_request: {e}")
+        return {"success": False, "message": "حدث خطأ غير متوقع."}
+
+
+def is_admin_tg(update: Update) -> bool:
+    """التحقق الآمن والصارم من صلاحيات الأدمن"""
+    try:
+        user_id = update.effective_user.id if update.effective_user else 0
+        return user_id in ADMIN_TELEGRAM_IDS
+    except Exception:
+        return False
+
+
+# ─────────────────────────────────────────────────
+#  القائمة الرئيسية وواجهة التليجرام
+# ─────────────────────────────────────────────────
+async def runner_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    keyboard = [
+        [InlineKeyboardButton("🤖 التحدث مع الذكاء الاصطناعي", callback_data="ai_menu")],
+        [InlineKeyboardButton("⚙️ لوحة تحكم السيرفرات", callback_data="main_menu")],
+    ]
+    await update.message.reply_text(
+        "👋 مرحباً بك في نظام 𝗘𝗛𝗔Б المتطور والشامل!\n\n"
+        "يمكنك إدارة سيرفراتك أو الاستعانة بأقوى نماذج الذكاء الاصطناعي.\n\n"
+        f"{DEVELOPER_INFO}",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def runner_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        "📚 مركز المساعدة والإرشادات:\n\n"
+        "• `/start` - القائمة الرئيسية ولوحة التحكم\n"
+        "• `/ai` - اختيار نموذج ذكاء اصطناعي والتحدث معه\n"
+        "• إدارة وتشغيل سيرفرات PHP و Python وتليجرام بنجاح.\n\n"
+        f"{DEVELOPER_INFO}"
+    )
+
+async def runner_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        "ℹ️ معلومات النظام:\n\n"
+        "🤖 الخدمة: 𝗘𝗛𝗔Б Host & AI Engine\n"
+        "✅ الحالة: نشط، مستمر وآمن 100%\n"
+        f"{DEVELOPER_INFO}"
+    )
+
+
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, edit=False):
+    api_key = context.user_data.get("api_key")
+    username = context.user_data.get("username", "")
+    is_adm = is_admin_tg(update)
+
+    keyboard = []
+
+    if api_key or is_adm:
+        keyboard.append([
+            InlineKeyboardButton("📁 سيرفراتي", callback_data="my_servers"),
+            InlineKeyboardButton("➕ إنشاء سيرفر", callback_data="create_server"),
+        ])
+        keyboard.append([
+            InlineKeyboardButton("🔑 تغيير API Key", callback_data="change_api"),
+            InlineKeyboardButton("🚪 تسجيل خروج", callback_data="logout"),
+        ])
+    else:
+        keyboard.append([InlineKeyboardButton("🔑 ربط اشتراك API Key", callback_data="enter_api")])
+
+    keyboard.append([InlineKeyboardButton("🤖 نماذج الذكاء الاصطناعي", callback_data="ai_menu")])
+
+    if is_adm:
+        pending_count = 0
+        result = api_request("/api/admin/pending", api_key=api_key)
+        if result and result.get("success"):
+            pending_count = len(result.get("requests", []))
+        bell = f"🔔 إشعارات ({pending_count})" if pending_count > 0 else "🔕 إشعارات"
+        keyboard.append([
+            InlineKeyboardButton("👑 لوحة الإدارة", callback_data="admin_panel"),
+            InlineKeyboardButton(bell, callback_data="admin_notifications"),
+        ])
+
+    keyboard.append([InlineKeyboardButton("💬 تواصل للاشتراك مع المطور @Y_20_20", url="[https://t.me/Y_20_20](https://t.me/Y_20_20)")])
+
+    text = (
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "      𝗘𝗛𝗔𝗕 🚀\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+    )
+    if is_adm:
+        text += "👑 أهلاً بك يا أدمن (صلاحية مجانية مطلقة)\n"
+    elif username:
+        text += f"👤 أهلاً، *{sanitize_input(username, 30)}*!\n"
+        
+    text += "✅ متصل بالنظام\n" if (api_key or is_adm) else "⚠️ يجب ربط اشتراكك أو مفتاح API أولاً\n"
+    text += f"\n{DEVELOPER_INFO}"
+
+    markup = InlineKeyboardMarkup(keyboard)
+    try:
+        query = update.callback_query
+        if edit and query:
+            if query.message.text != text:
+                await query.edit_message_text(text, parse_mode="Markdown", reply_markup=markup)
+            else:
+                await query.answer()
+        elif update.message:
+            await update.message.reply_text(text, parse_mode="Markdown", reply_markup=markup)
+        elif query:
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=markup)
+    except Exception as e:
+        logger.error(f"Error in show_main_menu: {e}")
+
 
 async def show_servers_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    try:
-        await query.answer()
-    except:
-        pass
-    
-    res = requests.get(f"{API_BASE_URL}/api/bot/servers", params={"api_key": context.user_data.get("api_key", "")})
-    try:
-        result = res.json()
-    except:
-        result = {}
-        
-    servers = result.get("servers", [])
-    if not servers:
-        await query.edit_message_text("🚀 لا توجد سيرفرات حالياً.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="main_menu")]]))
+    await query.answer()
+
+    api_key = context.user_data.get("api_key")
+    is_adm = is_admin_tg(update)
+
+    if not api_key and not is_adm:
+        await query.edit_message_text("❌ يجب ربط اشتراكك أو API Key أولاً.")
         return
+
+    result = api_request("/api/bot/servers", api_key=api_key)
+    if not result or not result.get("success"):
+        if is_adm and not api_key:
+            servers = []
+        else:
+            await query.edit_message_text(
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "❌ فشل جلب السيرفرات\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "تحقق من صحة الاشتراك أو API Key.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="main_menu")]]),
+            )
+            return
+    else:
+        servers = result.get("servers", [])
+
+    if not servers:
+        await query.edit_message_text(
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📭 لا توجد سيرفرات\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "أنشئ سيرفرك الأول الآن!",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("➕ إنشاء سيرفر", callback_data="create_server")],
+                [InlineKeyboardButton("🔙 رجوع", callback_data="main_menu")],
+            ]),
+        )
+        return
+
+    await query.edit_message_text(f"📋 لديك *{len(servers)}* سيرفر:", parse_mode="Markdown")
+
     for srv in servers:
-        status_emoji = "🟢" if srv['status'] == "Running" else "⚫"
-        text = f"{status_emoji} *{srv['title']}*\n📊 الحالة: {srv['status']}\n🔌 المنفذ: {srv['port']}"
+        status_emoji = "🟢" if srv.get("status") == "Running" else "⚫"
+        srv_type = srv.get("type", "Python")
+        type_icon = "🐍" if srv_type == "Python" else "🟨"
+        srv_title = sanitize_input(srv.get('title', 'Server'), 30)
+        folder = sanitize_input(srv.get('folder', ''), 50)
+
+        text = (
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"{status_emoji} *{srv_title}*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"{type_icon} النوع: `{srv_type}`\n"
+            f"📊 الحالة: `{sanitize_input(srv.get('status', 'Unknown'), 20)}`\n"
+            f"🔌 المنفذ: `{sanitize_input(str(srv.get('port', 'N/A')), 10)}`\n"
+            f"⏱ وقت التشغيل: {sanitize_input(str(srv.get('uptime', 'N/A')), 30)}"
+        )
         keyboard = [
-            [InlineKeyboardButton("▶️ تشغيل", callback_data=f"action_{srv['folder']}_start"),
-             InlineKeyboardButton("⏹️ إيقاف", callback_data=f"action_{srv['folder']}_stop"),
-             InlineKeyboardButton("🔄 إعادة", callback_data=f"action_{srv['folder']}_restart")],
-            [InlineKeyboardButton("🗑️ حذف", callback_data=f"action_{srv['folder']}_delete"),
-             InlineKeyboardButton("🖥️ كونسول", callback_data=f"console_{srv['folder']}")],
+            [
+                InlineKeyboardButton("▶️ تشغيل", callback_data=f"srv_start|{folder}"),
+                InlineKeyboardButton("⏹ إيقاف", callback_data=f"srv_stop|{folder}"),
+                InlineKeyboardButton("🔄 إعادة", callback_data=f"srv_restart|{folder}"),
+            ],
+            [
+                InlineKeyboardButton("🖥 كونسول", callback_data=f"console|{folder}"),
+                InlineKeyboardButton("⚠️ أخطاء", callback_data=f"errors|{folder}"),
+                InlineKeyboardButton("🗑 حذف", callback_data=f"srv_delete|{folder}"),
+            ],
+            [InlineKeyboardButton("📦 تثبيت مكتبات تلقائياً", callback_data=f"install|{folder}")],
         ]
-        await query.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
-    await show_main_menu(update, context)
+        await query.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    await query.message.reply_text(
+        "━━━━━━━━━━━━━━━━━━━━",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="main_menu")]]),
+    )
+
 
 async def show_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    try:
-        await query.answer()
-    except:
-        pass
-        
-    try:
-        metrics = requests.get(f"{API_BASE_URL}/api/system/metrics", timeout=5).json()
-    except:
-        metrics = {"cpu": 0, "memory": 0}
-        
-    text = f"👑 *لوحة الإدارة*\n\n🖥️ CPU: `{metrics.get('cpu')}%` | 💾 RAM: `{metrics.get('memory')}%`"
-    keyboard = [
-        [InlineKeyboardButton("👥 عرض المستخدمين", callback_data="admin_list_users"),
-         InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]
-    ]
-    await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup(keyboard))
+    await query.answer()
 
-async def admin_list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin_tg(update):
+        await query.edit_message_text("❌ غير مصرح لك بالدخول (للأدمن فقط).")
+        return
+
+    api_key = context.user_data.get("api_key")
+    result = api_request("/api/admin/users", api_key=api_key)
+    users = result.get("users", []) if result and result.get("success") else []
+
+    pending_result = api_request("/api/admin/pending", api_key=api_key)
+    pending_count = len(pending_result.get("requests", [])) if pending_result and pending_result.get("success") else 0
+
+    text = (
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "  👑 لوحة إدارة 𝗘𝗛𝗔Б\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"👥 المستخدمين: *{len(users)}*\n"
+        f"🔔 طلبات اشتراك معلقة: *{pending_count}*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+    )
+    for u in users[:10]:
+        uname = sanitize_input(u.get('username', 'User'), 25)
+        text += f"• `{uname}` | {u.get('max_servers', 1)} سيرفر\n"
+    if len(users) > 10:
+        text += f"... و {len(users) - 10} آخرين\n"
+
+    bell = f"🔔 طلبات ({pending_count})" if pending_count > 0 else "🔕 لا طلبات"
+    keyboard = [
+        [
+            InlineKeyboardButton(bell, callback_data="admin_notifications"),
+            InlineKeyboardButton("📊 إحصائيات", callback_data="admin_stats"),
+        ],
+        [InlineKeyboardButton("🗑 حذف مستخدم", callback_data="admin_delete_user")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="main_menu")],
+    ]
+    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def show_admin_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    try:
-        await query.answer()
-    except:
-        pass
-        
-    try:
-        response = requests.get(f"{API_BASE_URL}/api/admin/users", cookies={"session": "admin"}, timeout=5)
-        result = response.json()
-    except:
-        result = {}
-        
-    users = result.get("users", [])
-    user_lines = []
-    for u in users[:15]:
-        uname = u.get('username', 'unknown')
-        user_lines.append(f"🟢 `{uname}`")
-        
-    text = "👥 *قائمة المستخدمين*\n\n" + ("\n".join(user_lines) if user_lines else "لا يوجد مستخدمون.")
+    await query.answer()
+
+    if not is_admin_tg(update):
+        await query.edit_message_text("❌ غير مصرح.")
+        return
+
+    api_key = context.user_data.get("api_key")
+    result = api_request("/api/admin/pending", api_key=api_key)
+
+    if not result or not result.get("success"):
+        await query.edit_message_text("❌ فشل جلب طلبات الاشتراكات.")
+        return
+
+    requests_list = result.get("requests", [])
+
+    if not requests_list:
+        await query.edit_message_text(
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🔕 لا توجد طلبات اشتراك معلقة\n"
+            "━━━━━━━━━━━━━━━━━━━━",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_panel")]]),
+        )
+        return
+
     await query.edit_message_text(
-        text, 
-        parse_mode=ParseMode.MARKDOWN, 
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_panel")]])
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔔 طلبات اشتراكات جديدة ({len(requests_list)})\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
+    for req in requests_list:
+        uname = sanitize_input(req.get('username', 'N/A'), 30)
+        text = (
+            f"👤 المستخدم: `{uname}`\n"
+            f"📅 التاريخ: {str(req.get('created_at', ''))[:19]}"
+        )
+        keyboard = [[
+            InlineKeyboardButton("✅ قبول", callback_data=f"approve|{uname}"),
+            InlineKeyboardButton("❌ رفض", callback_data=f"reject|{uname}"),
+        ]]
+        await query.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    await query.message.reply_text(
+        "━━━━━━━━━━━━━━━━━━━━",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_panel")]]),
     )
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("📚 المساعدة:\nهذا البوت يعمل بشكل مستمر لإدارة السيرفرات والحسابات عبر المنصة.")
-
-async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ℹ️ معلومات البوت:\n🤖 النظام: EHAB & ELMODMEN HOST Bot\n✅ الحالة: نشط ومستمر")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get("api_key"):
-        try:
-            res = requests.post(f"{API_BASE_URL}/api/bot/verify", json={"api_key": context.user_data["api_key"]}, timeout=5).json()
-            if res.get("success"):
-                await update.message.reply_text(f"✅ مرحباً بعودتك!")
-                await show_main_menu(update, context)
-                return ConversationHandler.END
-        except:
-            pass
-    await update.message.reply_text("🤖 *أهلاً بك في بوت الاستضافة!*\n\nأرسل مفتاح API الخاص بك للبدء:", parse_mode=ParseMode.MARKDOWN)
+    is_adm = is_admin_tg(update)
+    
+    if is_adm:
+        context.user_data["is_admin"] = True
+
+    api_key = context.user_data.get("api_key")
+    if api_key:
+        result = api_request("/api/bot/verify", method="POST", data={"api_key": api_key})
+        if result and result.get("success"):
+            context.user_data["username"] = result.get("username")
+            await show_main_menu(update, context)
+            return ConversationHandler.END
+        context.user_data.clear()
+
+    if is_adm:
+        await show_main_menu(update, context)
+        return ConversationHandler.END
+
+    keyboard = [
+        [InlineKeyboardButton("🔑 إدخال API Key (تفعيل الاشتراك)", callback_data="enter_api")],
+        [InlineKeyboardButton("🤖 نماذج الذكاء الاصطناعي", callback_data="ai_menu")],
+        [InlineKeyboardButton("💬 تواصل للاشتراك مع المطور @Y_20_20", url="[https://t.me/Y_20_20](https://t.me/Y_20_20)")],
+    ]
+    await update.message.reply_text(
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "      𝗘𝗛𝗔Б 🚀\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "📌 نظام استضافة بوتات تيليجرام ومحرك الذكاء الاصطناعي والتصحيح\n\n"
+        "للاشتراك والحصول على حساب:\n"
+        "📬 تواصل مع المطور: @Y_20_20\n\n"
+        f"{DEVELOPER_INFO}",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
     return WAITING_FOR_API_KEY
 
+
 async def handle_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    api_key = update.message.text.strip()
-    try:
-        res = requests.post(f"{API_BASE_URL}/api/bot/verify", json={"api_key": api_key}, timeout=5).json()
-    except:
-        res = {"success": False}
-        
-    if not res.get("success"):
-        await update.message.reply_text("❌ مفتاح API غير صالح. حاول مجدداً:")
+    api_key = sanitize_input(update.message.text.strip(), 256)
+    if not api_key:
+        await update.message.reply_text("❌ مفتاح API غير صالح. أعد الإرسال:")
         return WAITING_FOR_API_KEY
+
+    result = api_request("/api/bot/verify", method="POST", data={"api_key": api_key})
+    if not result or not result.get("success"):
+        keyboard = [[InlineKeyboardButton("💬 تواصل مع المطور للاشتراك", url="[https://t.me/Y_20_20](https://t.me/Y_20_20)")]]
+        await update.message.reply_text(
+            "❌ *مفتاح الاشتراك أو API غير صالح!*\n\n"
+            "تأكد من الكود وحاول مرة أخرى\n"
+            "أو تواصل مع المطور للحصول على اشتراك: @Y_20_20",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return WAITING_FOR_API_KEY
+
     context.user_data["api_key"] = api_key
-    context.user_data["is_admin"] = res.get("is_admin", False)
-    await update.message.reply_text(f"✅ تم التحقق بنجاح!")
+    context.user_data["username"] = sanitize_input(result.get("username", ""), 30)
+    context.user_data["is_admin"] = result.get("is_admin", False)
+
+    await update.message.reply_text(
+        f"✅ *تم تفعيل الاشتراك والربط بنجاح!*\n"
+        f"👤 مرحباً *{context.user_data['username']}*!",
+        parse_mode="Markdown",
+    )
     await show_main_menu(update, context)
     return ConversationHandler.END
+
+
+async def start_create_server(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "➕ *إنشاء سيرفر جديد*\n\n📝 أرسل اسم السيرفر الآن:",
+        parse_mode="Markdown",
+    )
+    return WAITING_FOR_NEW_SERVER_NAME
+
+
+async def receive_server_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    name = sanitize_input(update.message.text.strip(), 30)
+    if not name:
+        await update.message.reply_text("❌ اسم السيرفر لا يمكن أن يكون فارغاً. أرسل اسم السيرفر من جديد:")
+        return WAITING_FOR_NEW_SERVER_NAME
+        
+    context.user_data["pending_server_name"] = name
+    keyboard = [[
+        InlineKeyboardButton("🐍 Python", callback_data="server_type_python"),
+        InlineKeyboardButton("🟨 Node.js", callback_data="server_type_nodejs"),
+    ]]
+    await update.message.reply_text(
+        f"📦 *اختر نوع السيرفر:*\n\nالاسم: `{name}`",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return WAITING_FOR_SERVER_TYPE
+
+
+async def receive_server_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    srv_type = "Python" if query.data == "server_type_python" else "Node.js"
+    name = context.user_data.get("pending_server_name", "Server")
+    api_key = context.user_data.get("api_key", "")
+
+    result = api_request("/api/bot/create_server", method="POST", data={
+        "api_key": api_key,
+        "name": name,
+        "server_type": srv_type,
+        "plan": "free",
+        "storage": 100,
+        "ram": 256,
+        "cpu": 0.5,
+    })
+
+    type_icon = "🐍" if srv_type == "Python" else "🟨"
+    if result and result.get("success"):
+        await query.edit_message_text(
+            f"✅ *تم إنشاء السيرفر بنجاح!*\n\n"
+            f"📛 الاسم: `{name}`\n"
+            f"{type_icon} النوع: `{srv_type}`\n\n"
+            f"ارفع ملفاتك عبر الموقع الآن.",
+            parse_mode="Markdown",
+        )
+    else:
+        err_msg = sanitize_input(result.get("message", "خطأ غير معروف") if result else "خطأ غير معروف", 100)
+        await query.edit_message_text(
+            f"❌ *فشل الإنشاء!*\n{err_msg}",
+            parse_mode="Markdown",
+        )
+
+    await show_main_menu(update, context)
+    return ConversationHandler.END
+
+
+async def show_console(update: Update, context: ContextTypes.DEFAULT_TYPE, folder: str):
+    query = update.callback_query
+    safe_folder = sanitize_input(folder, 50)
+    result = api_request("/api/bot/console", params={"folder": safe_folder}, api_key=context.user_data.get("api_key"))
+    if result and result.get("success"):
+        logs = result.get("logs", "لا توجد مخرجات")
+        if len(logs) > 3500:
+            logs = "...\n" + logs[-3500:]
+        keyboard = [[
+            InlineKeyboardButton("🔄 تحديث", callback_data=f"console|{safe_folder}"),
+            InlineKeyboardButton("🔙 رجوع", callback_data="my_servers"),
+        ]]
+        await query.edit_message_text(
+            f"🖥 *كونسول السيرفر*\n```\n{logs}\n```",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+    else:
+        await query.edit_message_text("❌ فشل جلب الكونسول")
+
+
+async def show_errors(update: Update, context: ContextTypes.DEFAULT_TYPE, folder: str):
+    query = update.callback_query
+    safe_folder = sanitize_input(folder, 50)
+    result = api_request("/api/bot/errors", params={"folder": safe_folder}, api_key=context.user_data.get("api_key"))
+    if result and result.get("success"):
+        errors = result.get("errors", "✅ لا توجد أخطاء")
+        if len(errors) > 3500:
+            errors = "...\n" + errors[-3500:]
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="my_servers")]]
+        await query.edit_message_text(
+            f"⚠️ *سجل الأخطاء*\n```\n{errors}\n```",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+    else:
+        await query.edit_message_text("❌ فشل جلب سجل الأخطاء")
+
+
+async def admin_delete_user_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin_tg(update):
+        await query.edit_message_text("❌ غير مصرح.")
+        return ConversationHandler.END
+    await query.edit_message_text("📝 أرسل اسم المستخدم الذي تريد حذفه:")
+    return WAITING_FOR_DELETE_USERNAME
+
+
+async def admin_delete_user_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    username = sanitize_input(update.message.text.strip(), 30)
+    result = api_request("/api/admin/delete-user", method="POST", data={
+        "api_key": context.user_data.get("api_key"),
+        "username": username,
+    })
+    if result and result.get("success"):
+        await update.message.reply_text(f"✅ تم حذف المستخدم `{username}`", parse_mode="Markdown")
+    else:
+        err_msg = sanitize_input(result.get("message", "خطأ") if result else "خطأ", 100)
+        await update.message.reply_text(f"❌ فشل: {err_msg}")
+    await show_main_menu(update, context)
+    return ConversationHandler.END
+
+
+async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    if not is_admin_tg(update):
+        await query.edit_message_text("❌ غير مصرح.")
+        return
+    api_key = context.user_data.get("api_key")
+    metrics = api_request("/api/system/metrics", api_key=api_key)
+    cpu = metrics.get("cpu", "?") if metrics else "?"
+    ram = metrics.get("memory", "?") if metrics else "?"
+    disk = metrics.get("disk", "?") if metrics else "?"
+    await query.edit_message_text(
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "  📊 إحصائيات النظام\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"🖥 CPU:  *{cpu}%*\n"
+        f"💾 RAM:  *{ram}%*\n"
+        f"💿 Disk: *{disk}%*",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="admin_panel")]]),
+    )
+
+
+# ─────────────────────────────────────────────────
+#  معالجات الذكاء الاصطناعي التفاعلية
+# ─────────────────────────────────────────────────
+async def ai_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    keyboard = []
+    for key, info in AI_MODELS.items():
+        keyboard.append([InlineKeyboardButton(f"🤖 {info['name']}", callback_data=f"ai_sel|{key}")])
+    keyboard.append([InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="main_menu")])
+
+    text = (
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🤖 *اختر نموذج الذكاء الاصطناعي:*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "اختر النموذج الذي ترغب في التحدث معه:"
+    )
+    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+
+async def ai_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = []
+    for key, info in AI_MODELS.items():
+        keyboard.append([InlineKeyboardButton(f"🤖 {info['name']}", callback_data=f"ai_sel|{key}")])
+    keyboard.append([InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="main_menu")])
+
+    await update.message.reply_text(
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "🤖 *اختر نموذج الذكاء الاصطناعي للتحدث معه:*\n"
+        "━━━━━━━━━━━━━━━━━━━━",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
-    
-    if data.startswith("jr_accept:"):
-        await handle_join_action(update, context, "accept", data.replace("jr_accept:", ""))
-        return
-    elif data.startswith("jr_decline:"):
-        await handle_join_action(update, context, "decline", data.replace("jr_decline:", ""))
-        return
 
-    if data == "main_menu": await show_main_menu(update, context)
-    elif data == "my_servers": await show_servers_list(update, context)
-    elif data == "create_server":
-        try:
-            await query.edit_message_text("أرسل اسم السيرفر الجديد:")
-        except:
-            await query.message.reply_text("أرسل اسم السيرفر الجديد:")
-        return WAITING_FOR_NEW_SERVER_NAME
+    if data == "main_menu":
+        await show_main_menu(update, context, edit=True)
+    elif data == "my_servers":
+        await show_servers_list(update, context)
+    elif data == "ai_menu":
+        await ai_menu_handler(update, context)
+    elif data in ("enter_api", "change_api"):
+        context.user_data.pop("api_key", None)
+        await query.edit_message_text(
+            "🔑 *أدخل مفتاح الاشتراك أو API Key الخاص بك:*\n\n"
+            "يمكنك الحصول عليه من لوحة التحكم بالموقع أو التواصل مع المطور @Y_20_20.",
+            parse_mode="Markdown",
+        )
+        return WAITING_FOR_API_KEY
     elif data == "logout":
         context.user_data.clear()
-        try:
-            await query.edit_message_text("🚪 تم تسجيل الخروج. استخدم /start للدخول.")
-        except:
-            pass
-    elif data == "admin_panel": await show_admin_panel(update, context)
-    elif data == "admin_list_users": await admin_list_users(update, context)
-    elif data.startswith("action_"):
-        parts = data.split('_')
-        folder, action = '_'.join(parts[1:-1]), parts[-1]
-        try:
-            requests.post(f"{API_BASE_URL}/api/bot/server/action", json={"api_key": context.user_data.get("api_key"), "folder": folder, "action": action}, timeout=5)
-        except:
-            pass
-        await show_servers_list(update, context)
-    elif data.startswith("console_"):
-        folder = data.replace("console_", "")
-        try:
-            res = requests.get(f"{API_BASE_URL}/api/bot/console", params={"api_key": context.user_data.get("api_key"), "folder": folder}, timeout=5).json()
-        except:
-            res = {"logs": "خطأ في جلب الكونسول"}
-        try:
-            await query.edit_message_text(f"📟 *الكونسول*\n```\n{res.get('logs', '')[-3000:]}\n```", parse_mode=ParseMode.MARKDOWN, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="my_servers")]]))
-        except:
-            pass
+        await query.edit_message_text("🚪 تم تسجيل الخروج بنجاح.\nاستخدم /start للدخول مجدداً.")
+    elif data == "create_server":
+        return await start_create_server(update, context)
+    elif data == "admin_panel":
+        await show_admin_panel(update, context)
+    elif data == "admin_notifications":
+        await show_admin_notifications(update, context)
+    elif data == "admin_delete_user":
+        return await admin_delete_user_start(update, context)
+    elif data == "admin_stats":
+        await admin_stats(update, context)
 
-async def receive_server_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    name = update.message.text.strip()
-    try:
-        requests.post(f"{API_BASE_URL}/api/bot/create_server", json={"api_key": context.user_data.get("api_key"), "name": name}, timeout=5)
-    except:
-        pass
-    await update.message.reply_text(f"✅ تم إنشاء السيرفر `{name}`", parse_mode=ParseMode.MARKDOWN)
-    await show_main_menu(update, context)
+    elif data.startswith("ai_sel|"):
+        _, model_key = data.split("|", 1)
+        if model_key in AI_MODELS:
+            selected_model = AI_MODELS[model_key]
+            context.user_data["active_ai_model"] = selected_model
+            
+            ai_sess = fetch_real_session()
+            if not ai_sess:
+                await query.answer("❌ تعذّر الاتصال بخادم الذكاء الاصطناعي.", show_alert=True)
+                return
+            context.user_data["ai_session"] = ai_sess
+
+            keyboard = [[InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="main_menu")]]
+            await query.edit_message_text(
+                f"✅ تم اختيار النموذج: *{selected_model['name']}*\n\n"
+                "💬 *أرسل رسالتك أو سؤالك الآن وسيقوم النموذج بالرد عليك:*",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return WAITING_FOR_AI_PROMPT
+
+    elif "|" in data:
+        try:
+            cmd, value = data.split("|", 1)
+            api_key = context.user_data.get("api_key")
+            safe_value = sanitize_input(value, 50)
+
+            if cmd in ("srv_start", "srv_stop", "srv_restart", "srv_delete"):
+                action = cmd.replace("srv_", "")
+                result = api_request("/api/bot/server/action", method="POST", data={
+                    "api_key": api_key, "folder": safe_value, "action": action,
+                })
+                if result and result.get("success"):
+                    await query.answer(result.get("message", "✅ تم")[:200], show_alert=True)
+                else:
+                    err_text = result.get('message', 'فشل') if result else 'خطأ'
+                    await query.answer(f"❌ {err_text}"[:200], show_alert=True)
+                await show_servers_list(update, context)
+
+            elif cmd == "console":
+                await show_console(update, context, safe_value)
+
+            elif cmd == "errors":
+                await show_errors(update, context, safe_value)
+
+            elif cmd == "install":
+                result = api_request("/api/bot/install", method="POST", data={
+                    "api_key": api_key, "folder": safe_value,
+                })
+                msg = result.get("message", "✅ جاري التثبيت") if result and result.get("success") else "❌ فشل بدء التثبيت"
+                await query.edit_message_text(
+                    f"📦 *تثبيت المكتبات*\n\n{msg}\n\nتابع الكونسول للتفاصيل.",
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🖥 كونسول", callback_data=f"console|{safe_value}"),
+                        InlineKeyboardButton("🔙 رجوع", callback_data="my_servers"),
+                    ]]),
+                )
+
+            elif cmd == "approve":
+                if not is_admin_tg(update):
+                    await query.answer("❌ غير مسموح", show_alert=True)
+                    return
+                result = api_request("/api/admin/approve", method="POST", data={
+                    "api_key": api_key, "username": safe_value,
+                })
+                msg = f"✅ تم قبول اشتراك {safe_value}" if result and result.get("success") else "❌ فشل القبول"
+                await query.answer(msg, show_alert=True)
+                await show_admin_notifications(update, context)
+
+            elif cmd == "reject":
+                if not is_admin_tg(update):
+                    await query.answer("❌ غير مسموح", show_alert=True)
+                    return
+                result = api_request("/api/admin/reject", method="POST", data={
+                    "api_key": api_key, "username": safe_value,
+                })
+                msg = f"🚫 تم رفض طلب {safe_value}" if result and result.get("success") else "❌ فشل الرفض"
+                await query.answer(msg, show_alert=True)
+                await show_admin_notifications(update, context)
+        except Exception as e:
+            logger.error(f"Error handling callback action: {e}")
+            await query.answer("❌ حدث خطأ أثناء تنفيذ الطلب.", show_alert=True)
+
     return ConversationHandler.END
 
-def run_telegram_bot():
+
+async def handle_ai_chat_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_msg = sanitize_input(update.message.text.strip(), 1000)
+    if not user_msg:
+        return WAITING_FOR_AI_PROMPT
+
+    if user_msg.lower() in ['خروج', 'exit', 'quit', '/start']:
+        context.user_data.pop("active_ai_model", None)
+        context.user_data.pop("ai_session", None)
+        await show_main_menu(update, context)
+        return ConversationHandler.END
+
+    model_info = context.user_data.get("active_ai_model")
+    ai_session = context.user_data.get("ai_session")
+
+    if not model_info or not ai_session:
+        await update.message.reply_text("⚠️ يرجى اختيار نموذج ذكاء اصطناعي أولاً عبر `/ai`.")
+        return ConversationHandler.END
+
+    processing_msg = await update.message.reply_text("🤖 *جاري توليد الرد والتصحيح...*", parse_mode="Markdown")
+
+    reply, _ = chat_with_model(model_info["id"], user_msg, ai_session)
+    if not reply:
+        ai_session = fetch_real_session()
+        if ai_session:
+            context.user_data["ai_session"] = ai_session
+            reply, _ = chat_with_model(model_info["id"], user_msg, ai_session)
+
+    if not reply:
+        reply = "❌ تعذّر الاتصال بنموذج الذكاء الاصطناعي أو انتهت الجلسة. حاول مرة أخرى."
+
     try:
-        app_bot = Application.builder().token(BOT_TOKEN).build()
-        conv_handler = ConversationHandler(
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=processing_msg.message_id,
+            text=f"🤖 *{model_info['name']}:*\n\n{reply}",
+            parse_mode="Markdown"
+        )
+    except Exception:
+        await context.bot.edit_message_text(
+            chat_id=update.effective_chat.id,
+            message_id=processing_msg.message_id,
+            text=f"🤖 {model_info['name']}:\n\n{reply}"
+        )
+
+    return WAITING_FOR_AI_PROMPT
+
+
+# ─────────────────────────────────────────────────
+#  دالة التشغيل الموحدة الشاملة
+# ─────────────────────────────────────────────────
+def run_bot(token: str, bot_name: str) -> None:
+    try:
+        print("\n" + "═"*60)
+        print(f" 🤖 𝗘𝗛𝗔Б - جاري تشغيل النظام: {bot_name}")
+        print(" 🚀 يتم الآن الاتصال بخوادم تليجرام ومحركات الذكاء الاصطناعي...")
+        print("═"*60 + "\n")
+        
+        application = Application.builder().token(token).build()
+
+        conv = ConversationHandler(
             entry_points=[
                 CommandHandler("start", start),
-                CommandHandler("help", help_command),
-                CommandHandler("info", info_command)
+                CommandHandler("ai", ai_command),
+                CommandHandler("help", runner_help),
+                CommandHandler("info", runner_info),
+                CallbackQueryHandler(button_callback),
             ],
             states={
-                WAITING_FOR_API_KEY: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_key)],
-                WAITING_FOR_NEW_SERVER_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_server_name)],
+                WAITING_FOR_API_KEY: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_api_key)
+                ],
+                WAITING_FOR_NEW_SERVER_NAME: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, receive_server_name)
+                ],
+                WAITING_FOR_SERVER_TYPE: [
+                    CallbackQueryHandler(receive_server_type, pattern="^server_type_")
+                ],
+                WAITING_FOR_DELETE_USERNAME: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, admin_delete_user_confirm)
+                ],
+                WAITING_FOR_AI_PROMPT: [
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_ai_chat_message)
+                ],
             },
-            fallbacks=[CommandHandler("start", start)],
-            per_message=False,
+            fallbacks=[
+                CommandHandler("start", start),
+                CommandHandler("ai", ai_command)
+            ],
+            per_user=True,
+            per_chat=True,
         )
-        app_bot.add_handler(conv_handler)
-        app_bot.add_handler(CallbackQueryHandler(button_callback))
-        app_bot.add_handler(ChatJoinRequestHandler(handle_join_request))
-        app_bot.run_polling(drop_pending_updates=True)
+
+        application.add_handler(conv)
+        application.add_handler(CallbackQueryHandler(button_callback))
+
+        print(f" ✅ النظام {bot_name} جاهز ويعمل بكفاءة على 𝗘𝗛𝗔Б!")
+        print(" 📡 الحالة: نشط وينتظر التحديثات والطلبات...\n")
+        application.run_polling(drop_pending_updates=True)
     except Exception as e:
-        print(f"Telegram Bot Error: {e}")
+        logger.error(f"❌ خطأ في تشغيل النظام {bot_name}: {str(e)}")
 
-
-# ============== تشغيل النظام الشامل ==============
-bot_process = None
-
-def stop_all(sig, frame):
-    global bot_process
-    if bot_process:
-        try:
-            bot_process.terminate()
-        except:
-            pass
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, stop_all)
-signal.signal(signal.SIGTERM, stop_all)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    print("=" * 60)
-    print("  🚀 𝗘𝗛𝗔𝗕 &  - النظام الشامل يعمل الآن")
-    print("=" * 60)
-    
-    # تشغيل نظام البقاء نشطاً Keep-Alive
-    threading.Thread(target=run_keep_alive_daemon, daemon=True).start()
-    
-    # تشغيل بوت التليجرام الرئيسي في الخلفية
-    threading.Thread(target=run_telegram_bot, daemon=True).start()
-    
-    # تشغيل تطبيق الويب Flask في الخيط الرئيسي
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+    if len(sys.argv) >= 2:
+        token = sys.argv[1]
+        bot_name = sys.argv[2] if len(sys.argv) > 2 else "ehab_unified_bot"
+        run_bot(token, bot_name)
+    else:
+        run_bot(BOT_TOKEN, "EHAB_Control_And_AI_Repair_System")
 
